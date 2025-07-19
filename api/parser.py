@@ -56,16 +56,15 @@ class ExcelParser:
 
     def normalizar_columnas(self, df: pd.DataFrame) -> pd.DataFrame:
         """Normaliza los nombres de las columnas del DataFrame"""
-        # Mapeo de nombres de columnas comunes
+        # Mapeo de nombres de columnas específicas para archivos LÜSQTOFF
         mapeo_columnas = {
-            'codigo': ['código', 'code', 'id', 'producto_id', 'cod', 'ref', 'modelo'],
-            'nombre': ['descripción', 'descripcion', 'descripcion', 'producto', 'name', 'desc', 'descrip', 'item'],
-            'capacidad': ['ah', 'amperaje', 'capacidad_ah', 'cap', 'amperes'],
-            'marca': ['brand', 'fabricante', 'marca', 'make'],
-            'categoria': ['tipo', 'tipo_canal', 'categoria', 'category', 'channel', 'tipo_venta', 'rubro', 'subrubro'],
-            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost', 'precio_lista', 'precio lista', 'precio lista'],
-            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico', 'pvp', 'pvp on line', 'pvp online', 'pvp on line', 'pvp on line'],
-            'stock': ['stock', 'cantidad', 'quantity', 'disponible', 'inventario', 'q_pallet', 'q. pallet', 'inner', 'master', 'q. pallet']
+            'codigo': ['modelo'],  # MODELO es el código del producto
+            'nombre': ['descripcion'],  # DESCRIPCION es el nombre del producto
+            'marca': ['marca'],  # MARCA
+            'categoria': ['rubro', 'subrubro'],  # RUBRO y SUBRUBRO
+            'precio_base': ['precio lista'],  # PRECIO LISTA
+            'precio_final': ['pvp on line'],  # PVP On line
+            'stock': ['q. pallet', 'inner', 'master']  # Cantidades
         }
         
         # Normalizar nombres de columnas
@@ -76,37 +75,35 @@ class ExcelParser:
                     columnas_normalizadas[nombre_posible] = columna_objetivo
                     break
         
-        # También buscar coincidencias parciales
+        # Mapeo exacto para columnas específicas
         for col in df.columns:
             col_lower = str(col).lower().strip()
             logger.info(f"Procesando columna: '{col}' -> '{col_lower}'")
             
-            if 'codigo' in col_lower or 'code' in col_lower or 'id' in col_lower or 'modelo' in col_lower:
-                if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'codigo'
-                    logger.info(f"  -> Mapeada a 'codigo'")
-            elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower or 'descripcion' in col_lower or 'descripción' in col_lower:
-                if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'nombre'
-                    logger.info(f"  -> Mapeada a 'nombre'")
-            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower or 'pvp' in col_lower or 'lista' in col_lower or 'precio lista' in col_lower:
-                if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'precio_base'
-                    logger.info(f"  -> Mapeada a 'precio_base'")
-            elif 'marca' in col_lower or 'brand' in col_lower:
-                if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'marca'
-                    logger.info(f"  -> Mapeada a 'marca'")
-            elif 'categoria' in col_lower or 'category' in col_lower or 'tipo' in col_lower or 'rubro' in col_lower or 'subrubro' in col_lower:
-                if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'categoria'
-                    logger.info(f"  -> Mapeada a 'categoria'")
-            elif 'stock' in col_lower or 'cantidad' in col_lower or 'q.' in col_lower or 'inner' in col_lower or 'master' in col_lower or 'pallet' in col_lower:
-                if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'stock'
-                    logger.info(f"  -> Mapeada a 'stock'")
+            # Mapeo exacto para archivos LÜSQTOFF
+            if col_lower == 'modelo':
+                columnas_normalizadas[col] = 'codigo'
+                logger.info(f"  -> Mapeada a 'codigo'")
+            elif col_lower == 'descripcion':
+                columnas_normalizadas[col] = 'nombre'
+                logger.info(f"  -> Mapeada a 'nombre'")
+            elif col_lower == 'precio lista':
+                columnas_normalizadas[col] = 'precio_base'
+                logger.info(f"  -> Mapeada a 'precio_base'")
+            elif col_lower == 'pvp on line':
+                columnas_normalizadas[col] = 'precio_final'
+                logger.info(f"  -> Mapeada a 'precio_final'")
+            elif col_lower == 'marca':
+                columnas_normalizadas[col] = 'marca'
+                logger.info(f"  -> Mapeada a 'marca'")
+            elif col_lower == 'rubro':
+                columnas_normalizadas[col] = 'categoria'
+                logger.info(f"  -> Mapeada a 'categoria'")
+            elif col_lower == 'q. pallet':
+                columnas_normalizadas[col] = 'stock'
+                logger.info(f"  -> Mapeada a 'stock'")
             else:
-                logger.info(f"  -> No mapeada")
+                logger.info(f"  -> No mapeada (columna opcional)")
         
         # Renombrar columnas
         df = df.rename(columns=columnas_normalizadas)
