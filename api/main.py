@@ -345,40 +345,69 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             excel_file = pd.ExcelFile(temp_file_path)
             logger.info(f"Archivo Excel con {len(excel_file.sheet_names)} hojas: {excel_file.sheet_names}")
             
-            # Analizar cada hoja
+            # Buscar específicamente la hoja "Moura"
+            hoja_moura = None
             for sheet_name in excel_file.sheet_names:
-                logger.info(f"=== ANALIZANDO HOJA: {sheet_name} ===")
-                
-                # Leer la hoja
-                df = pd.read_excel(temp_file_path, sheet_name=sheet_name)
-                logger.info(f"Columnas en hoja '{sheet_name}': {list(df.columns)}")
-                logger.info(f"Primeras 3 filas de '{sheet_name}':")
-                logger.info(df.head(3).to_string())
-                
-                # Verificar si tiene las columnas requeridas
-                columnas_requeridas = ['canal', 'línea', 'margen mínimo', 'margen óptimo']
-                columnas_encontradas = []
-                
-                for col in df.columns:
-                    col_lower = str(col).lower().strip()
-                    if any(req in col_lower for req in ['canal', 'channel']):
-                        columnas_encontradas.append('canal')
-                    elif any(req in col_lower for req in ['línea', 'linea', 'line']):
-                        columnas_encontradas.append('línea')
-                    elif any(req in col_lower for req in ['margen mínimo', 'margen_minimo', 'minimo']):
-                        columnas_encontradas.append('margen mínimo')
-                    elif any(req in col_lower for req in ['margen óptimo', 'margen_optimo', 'optimo']):
-                        columnas_encontradas.append('margen óptimo')
-                
-                logger.info(f"Columnas requeridas encontradas en '{sheet_name}': {columnas_encontradas}")
+                if 'moura' in sheet_name.lower():
+                    hoja_moura = sheet_name
+                    break
             
-            # Por ahora, solo devolver información de diagnóstico
+            if not hoja_moura:
+                logger.error(f"No se encontró hoja 'Moura' en el archivo. Hojas disponibles: {excel_file.sheet_names}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"No se encontró hoja 'Moura' en el archivo. Hojas disponibles: {excel_file.sheet_names}"
+                )
+            
+            logger.info(f"=== PROCESANDO HOJA: {hoja_moura} ===")
+            
+            # Leer la hoja Moura
+            df = pd.read_excel(temp_file_path, sheet_name=hoja_moura)
+            logger.info(f"Columnas en hoja '{hoja_moura}': {list(df.columns)}")
+            logger.info(f"Primeras 3 filas de '{hoja_moura}':")
+            logger.info(df.head(3).to_string())
+            
+            # Verificar si tiene las columnas requeridas
+            columnas_requeridas = ['canal', 'línea', 'margen mínimo', 'margen óptimo']
+            columnas_encontradas = []
+            columnas_faltantes = []
+            
+            for col in df.columns:
+                col_lower = str(col).lower().strip()
+                if any(req in col_lower for req in ['canal', 'channel']):
+                    columnas_encontradas.append('canal')
+                elif any(req in col_lower for req in ['línea', 'linea', 'line']):
+                    columnas_encontradas.append('línea')
+                elif any(req in col_lower for req in ['margen mínimo', 'margen_minimo', 'minimo']):
+                    columnas_encontradas.append('margen mínimo')
+                elif any(req in col_lower for req in ['margen óptimo', 'margen_optimo', 'optimo']):
+                    columnas_encontradas.append('margen óptimo')
+            
+            # Verificar columnas faltantes
+            for req in columnas_requeridas:
+                if req not in columnas_encontradas:
+                    columnas_faltantes.append(req)
+            
+            logger.info(f"Columnas requeridas encontradas en '{hoja_moura}': {columnas_encontradas}")
+            logger.info(f"Columnas faltantes: {columnas_faltantes}")
+            
+            if columnas_faltantes:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"La hoja '{hoja_moura}' no contiene las columnas requeridas: {columnas_faltantes}. Columnas encontradas: {columnas_encontradas}"
+                )
+            
+            # Si llegamos aquí, la hoja tiene las columnas correctas
+            logger.info(f"✅ Hoja '{hoja_moura}' válida con {len(df)} filas")
+            
             return {
-                "mensaje": f"Archivo analizado: {file.filename} con {len(excel_file.sheet_names)} hojas",
-                "hojas": excel_file.sheet_names,
+                "mensaje": f"Archivo analizado: {file.filename} - Hoja '{hoja_moura}' válida con {len(df)} filas",
+                "hoja_procesada": hoja_moura,
+                "filas_encontradas": len(df),
+                "columnas_encontradas": columnas_encontradas,
                 "archivo_original": file.filename,
                 "tamaño_archivo": len(contenido),
-                "status": "diagnostico"
+                "status": "exito"
             }
             
         finally:
