@@ -113,9 +113,14 @@ async def upload_file(file: UploadFile = File(...)):
             if file.filename.endswith('.pdf'):
                 logger.info(f"Detectado archivo PDF: {file.filename}")
                 
-                # Importar convertidor PDF
-                from pdf_converter import PDFConverter
-                pdf_converter = PDFConverter()
+                # Importar convertidor PDF Lite para Vercel
+                try:
+                    from pdf_converter import PDFConverter
+                    pdf_converter = PDFConverter()
+                except ImportError:
+                    # Fallback a versión lite si las dependencias pesadas no están disponibles
+                    from .pdf_converter_lite import PDFConverterLite
+                    pdf_converter = PDFConverterLite()
                 
                 # Convertir PDF a Excel
                 excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)

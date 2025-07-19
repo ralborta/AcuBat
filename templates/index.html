@@ -250,6 +250,13 @@
                             <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
                             <h5>Arrastra tu archivo aquí</h5>
                             <p class="text-muted">Soporta Excel (.xlsx, .xls), CSV (.csv) y PDF (.pdf)</p>
+                            <div class="alert alert-info mt-2" id="pdfInstructions" style="display: none;">
+                                <small>
+                                    <strong>📄 PDF detectado:</strong> Para mejor compatibilidad, 
+                                    <a href="https://smallpdf.com/pdf-to-excel" target="_blank">convierte a Excel aquí</a> 
+                                    antes de subir.
+                                </small>
+                            </div>
                             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf" style="display: none;">
                             <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
                                 <i class="fas fa-file-upload me-1"></i>
@@ -450,6 +457,13 @@
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
+                // Mostrar instrucciones si es PDF
+                const pdfInstructions = document.getElementById('pdfInstructions');
+                if (file.name.toLowerCase().endsWith('.pdf')) {
+                    pdfInstructions.style.display = 'block';
+                } else {
+                    pdfInstructions.style.display = 'none';
+                }
                 uploadFile(file);
             }
         });
