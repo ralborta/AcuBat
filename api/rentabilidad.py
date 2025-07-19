@@ -233,78 +233,45 @@ class RentabilidadValidator:
         
         return None
     
-    def evaluar_rentabilidad(self, producto) -> Dict:
-        """Evalúa la rentabilidad de un producto según las reglas cargadas"""
+    def evaluar_rentabilidad(self, marca: str, canal: str, linea: str, margen_actual: float) -> Tuple[str, Optional[float], Optional[float]]:
+        """
+        Evalúa la rentabilidad de un producto contra las reglas cargadas
+        
+        Returns:
+            Tuple[estado, margen_minimo_esperado, margen_optimo_esperado]
+        """
         try:
-            if not self.archivo_cargado:
-                return {
-                    'estado': 'Sin referencia',
-                    'mensaje': 'Archivo de rentabilidades no cargado',
-                    'margen_minimo': 0,
-                    'margen_optimo': 0,
-                    'diferencia': 0
-                }
+            # Normalizar parámetros
+            marca_norm = marca.title() if marca else "General"
+            canal_norm = self.normalizar_canal(canal)
+            linea_norm = self.normalizar_linea(linea)
             
-            # Obtener datos del producto
-            marca = producto.marca.value
-            canal = producto.canal.value
-            linea = self.extraer_linea_producto(producto)
-            margen_actual = producto.margen
+            # Buscar regla correspondiente
+            clave = (marca_norm, canal_norm, linea_norm)
             
-            # Buscar regla específica
-            clave_especifica = (marca, canal, linea)
-            regla = self.tabla_rentabilidad.get(clave_especifica)
+            if clave not in self.tabla_rentabilidad:
+                logger.warning(f"No se encontró regla para: {marca_norm} - {canal_norm} - {linea_norm}")
+                return "Sin ref.", None, None
             
-            # Si no hay regla específica, buscar por marca y canal
-            if not regla:
-                clave_general = (marca, canal, 'general')
-                regla = self.tabla_rentabilidad.get(clave_general)
+            regla = self.tabla_rentabilidad[clave]
+            margen_minimo = regla.get('margen_minimo', 20)
+            margen_optimo = regla.get('margen_optimo', 30)
             
-            # Si no hay regla, buscar solo por marca
-            if not regla:
-                clave_marca = (marca, 'general', 'general')
-                regla = self.tabla_rentabilidad.get(clave_marca)
-            
-            if not regla:
-                return {
-                    'estado': 'Sin referencia',
-                    'mensaje': f'No hay regla para {marca} - {canal} - {linea}',
-                    'margen_minimo': 0,
-                    'margen_optimo': 0,
-                    'diferencia': 0
-                }
-            
-            # Evaluar margen
-            margen_minimo = regla['margen_minimo']
-            margen_optimo = regla['margen_optimo']
-            
-            if margen_actual < margen_minimo:
-                estado = 'Ajustar'
-                mensaje = f'Margen {margen_actual:.1f}% < mínimo {margen_minimo:.1f}%'
-            elif margen_actual < margen_optimo:
-                estado = 'Revisar'
-                mensaje = f'Margen {margen_actual:.1f}% entre mínimo y óptimo'
+            # Evaluar estado
+            if margen_actual >= margen_optimo:
+                estado = "OK"
+            elif margen_actual >= margen_minimo:
+                estado = "Revisar"
             else:
-                estado = 'OK'
-                mensaje = f'Margen {margen_actual:.1f}% ≥ óptimo {margen_optimo:.1f}%'
+                estado = "Ajustar"
             
-            return {
-                'estado': estado,
-                'mensaje': mensaje,
-                'margen_minimo': margen_minimo,
-                'margen_optimo': margen_optimo,
-                'diferencia': margen_actual - margen_minimo
-            }
+            logger.debug(f"Evaluación rentabilidad: {marca_norm} - {canal_norm} - {linea_norm} = {estado} (actual: {margen_actual}%, min: {margen_minimo}%, opt: {margen_optimo}%)")
+            
+            return estado, margen_minimo, margen_optimo
             
         except Exception as e:
-            logger.error(f"Error evaluando rentabilidad de {producto.codigo}: {e}")
-            return {
-                'estado': 'Error',
-                'mensaje': f'Error en evaluación: {str(e)}',
-                'margen_minimo': 0,
-                'margen_optimo': 0,
-                'diferencia': 0
-            }
+            logger.error(f"Error evaluando rentabilidad: {str(e)}")
+            return "Error", None, None
     
     def extraer_linea_producto(self, producto) -> str:
         """Extrae la línea del producto basándose en su información"""
@@ -334,41 +301,50 @@ class RentabilidadValidator:
             return 'general'
     
     def obtener_resumen_rentabilidad(self) -> Dict:
-        """Obtiene un resumen de las reglas de rentabilidad cargadas"""
+        """Obtiene un resumen de las rentabilidades cargadas"""
         try:
-            resumen = {
-                'total_reglas': len(self.tabla_rentabilidad),
-                'por_marca': {},
-                'por_canal': {},
-                'por_linea': {}
-            }
+            if not self.archivo_cargado:
+                return {
+                    'total_reglas': 0,
+                    'por_marca': {},
+                    'por_canal': {},
+                    'por_linea': {},
+                    'archivo': None
+                }
             
-            for clave, regla in self.tabla_rentabilidad.items():
-                marca = regla['marca'].value
-                canal = regla['canal'].value
-                linea = regla['linea']
-                
+            # Contar reglas por categoría
+            por_marca = {}
+            por_canal = {}
+            por_linea = {}
+            
+            for (marca, canal, linea), regla in self.tabla_rentabilidad.items():
                 # Contar por marca
-                if marca not in resumen['por_marca']:
-                    resumen['por_marca'][marca] = 0
-                resumen['por_marca'][marca] += 1
+                por_marca[marca] = por_marca.get(marca, 0) + 1
                 
                 # Contar por canal
-                if canal not in resumen['por_canal']:
-                    resumen['por_canal'][canal] = 0
-                resumen['por_canal'][canal] += 1
+                por_canal[canal] = por_canal.get(canal, 0) + 1
                 
                 # Contar por línea
-                if linea not in resumen['por_linea']:
-                    resumen['por_linea'][linea] = 0
-                resumen['por_linea'][linea] += 1
+                por_linea[linea] = por_linea.get(linea, 0) + 1
             
-            return resumen
+            return {
+                'total_reglas': len(self.tabla_rentabilidad),
+                'por_marca': por_marca,
+                'por_canal': por_canal,
+                'por_linea': por_linea,
+                'archivo': self.archivo_origen
+            }
             
         except Exception as e:
             logger.error(f"Error obteniendo resumen de rentabilidad: {e}")
-            return {'total_reglas': 0, 'por_marca': {}, 'por_canal': {}, 'por_linea': {}} 
-
+            return {
+                'total_reglas': 0,
+                'por_marca': {},
+                'por_canal': {},
+                'por_linea': {},
+                'archivo': None
+            }
+    
     def leer_archivo_rentabilidad(self, file_path: str) -> bool:
         """
         Lee archivo de rentabilidades con hojas específicas por marca
