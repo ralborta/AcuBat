@@ -332,13 +332,15 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
         
         # Verificar que sea un archivo Excel
         if not file.filename.endswith(('.xlsx', '.xls')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) para rentabilidades")
+            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten archivos Excel (.xlsx, .xls) para rentabilidades")
         
         # Leer el archivo
         contenido = file.file.read()
         
         if not contenido:
             raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        logger.info(f"Procesando archivo de rentabilidades: {file.filename} ({len(contenido)} bytes)")
         
         # Guardar archivo temporalmente
         import tempfile
@@ -352,16 +354,19 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             rentabilidad_cargada = pricing_logic.cargar_rentabilidades(temp_file_path)
             
             if not rentabilidad_cargada:
-                raise HTTPException(status_code=400, detail="No se pudo cargar el archivo de rentabilidades")
+                raise HTTPException(status_code=400, detail="No se pudo cargar el archivo de rentabilidades. Verifica que el archivo contenga hojas con columnas: Canal, Línea, Margen Mínimo, Margen Óptimo")
             
             # Obtener resumen de rentabilidades
             resumen_rentabilidad = pricing_logic.rentabilidad_validator.obtener_resumen_rentabilidad()
             
+            logger.info(f"Rentabilidades cargadas exitosamente: {resumen_rentabilidad.get('total_reglas', 0)} reglas")
+            
             return {
-                "mensaje": "Archivo de rentabilidades cargado exitosamente",
+                "mensaje": f"Archivo de rentabilidades cargado exitosamente. {resumen_rentabilidad.get('total_reglas', 0)} reglas procesadas.",
                 "reglas_cargadas": resumen_rentabilidad.get('total_reglas', 0),
                 "resumen_rentabilidad": resumen_rentabilidad,
-                "archivo_original": file.filename
+                "archivo_original": file.filename,
+                "tamaño_archivo": len(contenido)
             }
             
         finally:
@@ -372,7 +377,7 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al cargar rentabilidades: {str(e)}")
+        logger.error(f"Error al cargar rentabilidades {file.filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al cargar rentabilidades: {str(e)}")
 
 @app.get("/api/estado-rentabilidad")
