@@ -52,13 +52,13 @@ class ExcelParser:
         """Normaliza los nombres de las columnas del DataFrame"""
         # Mapeo de nombres de columnas comunes
         mapeo_columnas = {
-            'codigo': ['código', 'code', 'id', 'producto_id'],
-            'nombre': ['descripción', 'descripcion', 'producto', 'name', 'desc'],
-            'capacidad': ['ah', 'amperaje', 'capacidad_ah'],
-            'marca': ['brand', 'fabricante'],
-            'canal': ['tipo', 'tipo_canal', 'categoria'],
-            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo'],
-            'precio_final': ['precio_final', 'precio_venta', 'precio_publico']
+            'codigo': ['código', 'code', 'id', 'producto_id', 'cod', 'ref'],
+            'nombre': ['descripción', 'descripcion', 'producto', 'name', 'desc', 'descrip', 'item'],
+            'capacidad': ['ah', 'amperaje', 'capacidad_ah', 'cap', 'amperes'],
+            'marca': ['brand', 'fabricante', 'marca', 'make'],
+            'canal': ['tipo', 'tipo_canal', 'categoria', 'channel', 'tipo_venta'],
+            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost'],
+            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico']
         }
         
         # Normalizar nombres de columnas
@@ -68,6 +68,25 @@ class ExcelParser:
                 if nombre_posible in df.columns:
                     columnas_normalizadas[nombre_posible] = columna_objetivo
                     break
+        
+        # También buscar coincidencias parciales
+        for col in df.columns:
+            col_lower = col.lower()
+            if 'codigo' in col_lower or 'code' in col_lower or 'id' in col_lower:
+                if col not in columnas_normalizadas:
+                    columnas_normalizadas[col] = 'codigo'
+            elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower:
+                if col not in columnas_normalizadas:
+                    columnas_normalizadas[col] = 'nombre'
+            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower:
+                if col not in columnas_normalizadas:
+                    columnas_normalizadas[col] = 'precio_base'
+            elif 'marca' in col_lower or 'brand' in col_lower:
+                if col not in columnas_normalizadas:
+                    columnas_normalizadas[col] = 'marca'
+            elif 'canal' in col_lower or 'channel' in col_lower or 'tipo' in col_lower:
+                if col not in columnas_normalizadas:
+                    columnas_normalizadas[col] = 'canal'
         
         # Renombrar columnas
         df = df.rename(columns=columnas_normalizadas)
