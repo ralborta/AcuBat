@@ -153,16 +153,20 @@ class ExcelParser:
             logger.info(f"Columnas finales: {list(df.columns)}")
             
             # Verificar que tengamos las columnas mínimas requeridas
+            columnas_disponibles = [str(col).lower().strip() for col in df.columns]
+            logger.info(f"Columnas disponibles: {columnas_disponibles}")
+            
+            # Verificar columnas requeridas
             columnas_requeridas = ['modelo', 'descripcion', 'precio lista', 'pvp on line']
             columnas_faltantes = []
             
             for col_req in columnas_requeridas:
-                if col_req not in [str(col).lower().strip() for col in df.columns]:
+                if col_req not in columnas_disponibles:
                     columnas_faltantes.append(col_req)
             
             if columnas_faltantes:
                 logger.error(f"Columnas requeridas faltantes: {columnas_faltantes}")
-                logger.error(f"Columnas disponibles: {[str(col).lower().strip() for col in df.columns]}")
+                logger.error(f"Columnas disponibles: {columnas_disponibles}")
                 return []  # Retornar lista vacía si faltan columnas requeridas
             
             # Normalizar columnas
@@ -193,7 +197,6 @@ class ExcelParser:
             # Si no se procesaron productos, dar información detallada
             if len(productos) == 0:
                 logger.error(f"No se procesaron productos. Columnas disponibles: {list(df.columns)}")
-                logger.error(f"Columnas normalizadas: {list(df.columns)}")
                 
                 # Verificar qué columnas se mapearon
                 columnas_requeridas = ['codigo', 'nombre', 'precio_base', 'precio_final']
@@ -204,7 +207,7 @@ class ExcelParser:
                         columnas_faltantes.append(col_req)
                 
                 if columnas_faltantes:
-                    logger.error(f"Columnas faltantes: {columnas_faltantes}")
+                    logger.error(f"Columnas faltantes después de normalizar: {columnas_faltantes}")
             
             return productos
             
