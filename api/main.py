@@ -236,6 +236,15 @@ async def index(request: Request):
         </html>
         """)
 
+@app.get("/test")
+async def test_endpoint():
+    """Endpoint de prueba para verificar que la aplicación funciona"""
+    return {
+        "mensaje": "✅ API funcionando correctamente",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "status": "ok"
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check para verificar que la aplicación funciona"""
@@ -287,7 +296,8 @@ async def upload_file(file: UploadFile = File(...)):
             "mensaje": f"✅ Archivo recibido correctamente: {file.filename} ({len(contenido)} bytes)",
             "archivo": file.filename,
             "tamaño": len(contenido),
-            "tipo": file.content_type
+            "tipo": file.content_type,
+            "status": "success"
         }
         
     except HTTPException:
