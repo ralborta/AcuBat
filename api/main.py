@@ -68,23 +68,30 @@ async def upload_file(file: UploadFile = File(...)):
         if not file.filename.endswith(('.xlsx', '.xls')):
             raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls)")
         
-        # Guardar archivo temporalmente
-        ruta_archivo = f"data/{file.filename}"
-        os.makedirs("data", exist_ok=True)
+        # En Vercel, usar memoria en lugar de archivos temporales
+        import io
         
-        with open(ruta_archivo, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Leer el archivo directamente desde memoria
+        contenido = file.file.read()
         
-        # Procesar archivo
-        productos = parser.leer_excel(ruta_archivo)
-        productos_procesados = logica.procesar_productos(productos)
+        # Crear un buffer en memoria
+        buffer = io.BytesIO(contenido)
         
-        # Actualizar productos globales
-        global productos_actuales
-        productos_actuales = productos_procesados
-        
-        # Limpiar archivo temporal
-        os.remove(ruta_archivo)
+        # Procesar archivo desde memoria
+        try:
+            import pandas as pd
+            df = pd.read_excel(buffer)
+            
+            # Convertir DataFrame a productos usando el parser
+            productos = parser.convertir_dataframe_a_productos(df)
+            productos_procesados = logica.procesar_productos(productos)
+            
+            # Actualizar productos globales
+            global productos_actuales
+            productos_actuales = productos_procesados
+            
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error al procesar Excel: {str(e)}")
         
         return {
             "mensaje": "Archivo procesado exitosamente",
@@ -184,12 +191,65 @@ async def get_resumen():
 
 @app.post("/api/crear-ejemplo")
 async def crear_archivo_ejemplo():
-    """Crea un archivo Excel de ejemplo para testing"""
+    """Crea datos de ejemplo para testing"""
     try:
-        ruta_archivo = parser.crear_archivo_ejemplo()
-        return {"mensaje": "Archivo de ejemplo creado", "ruta": ruta_archivo}
+        # Crear productos de ejemplo directamente en memoria
+        productos_ejemplo = [
+            Producto(
+                codigo="MO123",
+                nombre="Bateria 60 Ah",
+                capacidad="60 Ah",
+                marca=Marca.MOURA,
+                canal=Canal.MINORISTA,
+                precio_base=74.07,
+                precio_final=100.00,
+                margen=35.0
+            ),
+            Producto(
+                codigo="MO456",
+                nombre="Bateria 70 Ah",
+                capacidad="70 Ah",
+                marca=Marca.MOURA,
+                canal=Canal.MAYORISTA,
+                precio_base=96.00,
+                precio_final=120.00,
+                margen=25.0
+            ),
+            Producto(
+                codigo="ZX100",
+                nombre="Bateria solar",
+                capacidad="100 Ah",
+                marca=Marca.SOLAR,
+                canal=Canal.MINORISTA,
+                precio_base=111.11,
+                precio_final=150.00,
+                margen=35.0
+            ),
+            Producto(
+                codigo="LB200",
+                nombre="Bateria Lubeck",
+                capacidad="120 Ah",
+                marca=Marca.LUBECK,
+                canal=Canal.MINORISTA,
+                precio_base=118.52,
+                precio_final=160.00,
+                margen=35.0
+            )
+        ]
+        
+        # Procesar productos con lógica de negocio
+        productos_procesados = logica.procesar_productos(productos_ejemplo)
+        
+        # Actualizar productos globales
+        global productos_actuales
+        productos_actuales = productos_procesados
+        
+        return {
+            "mensaje": "Datos de ejemplo creados exitosamente",
+            "productos_creados": len(productos_procesados)
+        }
     except Exception as e:
-        logger.error(f"Error al crear archivo de ejemplo: {e}")
+        logger.error(f"Error al crear datos de ejemplo: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/api/status")

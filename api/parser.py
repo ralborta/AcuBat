@@ -89,6 +89,14 @@ class ExcelParser:
         
         return productos
 
+    def convertir_dataframe_a_productos(self, df: pd.DataFrame) -> List[Producto]:
+        """Convierte un DataFrame directamente a productos (para Vercel)"""
+        # Normalizar columnas
+        df = self.normalizar_columnas(df)
+        
+        # Convertir a productos
+        return self.convertir_a_productos(df)
+
     def fila_a_producto(self, row: pd.Series, index: int) -> Optional[Producto]:
         """Convierte una fila del DataFrame a un objeto Producto"""
         try:
