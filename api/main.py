@@ -8,11 +8,6 @@ import shutil
 from typing import List, Optional
 import logging
 
-from .models import Producto, Canal, Marca, TipoAlerta, ProductoResponse
-from .parser import ExcelParser
-from .logic import LogicaNegocio
-from .openai_helper import OpenAIHelper
-
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,29 +26,56 @@ except:
     pass  # En Vercel no necesitamos archivos estáticos
 templates = Jinja2Templates(directory="templates")
 
-# Inicializar componentes
-parser = ExcelParser()
-logica = LogicaNegocio()
-openai_helper = OpenAIHelper()
-
 # Variable global para almacenar productos procesados
-productos_actuales: List[Producto] = []
+productos_actuales: List = []
+
+# Inicializar componentes de forma lazy
+def get_parser():
+    from .parser import ExcelParser
+    return ExcelParser()
+
+def get_logica():
+    from .logic import LogicaNegocio
+    return LogicaNegocio()
+
+def get_openai_helper():
+    from .openai_helper import OpenAIHelper
+    return OpenAIHelper()
+
+def get_models():
+    from .models import Producto, Canal, Marca, TipoAlerta, ProductoResponse
+    return Producto, Canal, Marca, TipoAlerta, ProductoResponse
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Página principal con panel de productos"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    parser = get_parser()
+    logica = get_logica()
+    openai_helper = get_openai_helper()
+
+    # Obtener productos actuales si existen, de lo contrario, dejar la lista vacía
+    productos_actuales_data = productos_actuales if productos_actuales else []
+
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "productos": productos_actuales,
-        "total_productos": len(productos_actuales),
-        "productos_con_alertas": len([p for p in productos_actuales if p.alertas]),
+        "productos": productos_actuales_data,
+        "total_productos": len(productos_actuales_data),
+        "productos_con_alertas": len([p for p in productos_actuales_data if p.alertas]),
         "openai_disponible": openai_helper.esta_disponible()
     })
 
 @app.get("/alertas", response_class=HTMLResponse)
 async def alertas(request: Request):
     """Página de alertas"""
-    productos_con_alertas = [p for p in productos_actuales if p.alertas]
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    parser = get_parser()
+    logica = get_logica()
+    openai_helper = get_openai_helper()
+
+    # Obtener productos actuales si existen, de lo contrario, dejar la lista vacía
+    productos_actuales_data = productos_actuales if productos_actuales else []
+    productos_con_alertas = [p for p in productos_actuales_data if p.alertas]
     return templates.TemplateResponse("alertas.html", {
         "request": request,
         "productos": productos_con_alertas,
@@ -105,18 +127,21 @@ async def upload_file(file: UploadFile = File(...)):
         logger.info(f"Columnas encontradas: {list(df.columns)}")
         
         # Convertir DataFrame a productos usando el parser
+        Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+        parser = get_parser()
         productos = parser.convertir_dataframe_a_productos(df)
         
-                    if not productos:
-                # Obtener información sobre las columnas encontradas
-                columnas_encontradas = list(df.columns)
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"No se pudieron procesar productos del archivo. Columnas encontradas: {columnas_encontradas}. Se requieren: MODELO, DESCRIPCION, PRECIO LISTA, PVP On line"
-                )
+        if not productos:
+            # Obtener información sobre las columnas encontradas
+            columnas_encontradas = list(df.columns)
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No se pudieron procesar productos del archivo. Columnas encontradas: {columnas_encontradas}. Se requieren: MODELO, DESCRIPCION, PRECIO LISTA, PVP On line"
+            )
         
         logger.info(f"Productos procesados: {len(productos)}")
         
+        logica = get_logica()
         productos_procesados = logica.procesar_productos(productos)
         
         # Actualizar productos globales
@@ -148,6 +173,8 @@ async def get_productos(
     con_alertas: Optional[bool] = None
 ):
     """API endpoint para obtener productos con filtros"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    logica = get_logica()
     productos_filtrados = logica.obtener_productos_filtrados(
         productos_actuales, canal, marca, con_alertas
     )
@@ -165,6 +192,7 @@ async def get_productos(
 @app.get("/api/alertas")
 async def get_alertas():
     """API endpoint para obtener solo productos con alertas"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
     productos_con_alertas = [p for p in productos_actuales if p.alertas]
     
     return {
@@ -182,6 +210,8 @@ async def get_alertas():
 @app.post("/api/analizar-ai")
 async def analizar_con_ai():
     """Analiza productos con OpenAI"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    openai_helper = get_openai_helper()
     if not openai_helper.esta_disponible():
         raise HTTPException(status_code=400, detail="OpenAI no está disponible")
     
@@ -206,6 +236,8 @@ async def analizar_con_ai():
 @app.post("/api/sugerir-markup/{codigo_producto}")
 async def sugerir_markup(codigo_producto: str, contexto: str = Form("")):
     """Sugiere markup para un producto específico"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    openai_helper = get_openai_helper()
     if not openai_helper.esta_disponible():
         raise HTTPException(status_code=400, detail="OpenAI no está disponible")
     
@@ -224,6 +256,8 @@ async def sugerir_markup(codigo_producto: str, contexto: str = Form("")):
 @app.get("/api/resumen")
 async def get_resumen():
     """Obtiene resumen estadístico de productos"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    logica = get_logica()
     resumen = logica.generar_resumen(productos_actuales)
     return resumen
 
@@ -232,6 +266,8 @@ async def crear_archivo_ejemplo():
     """Crea datos de ejemplo para testing"""
     try:
         # Crear productos de ejemplo directamente en memoria
+        Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+        logica = get_logica()
         productos_ejemplo = [
             Producto(
                 codigo="MO123",
@@ -293,6 +329,8 @@ async def crear_archivo_ejemplo():
 @app.get("/api/status")
 async def get_status():
     """Obtiene el estado del sistema"""
+    Producto, Canal, Marca, TipoAlerta, ProductoResponse = get_models()
+    openai_helper = get_openai_helper()
     return {
         "productos_cargados": len(productos_actuales),
         "openai_disponible": openai_helper.esta_disponible(),
