@@ -59,12 +59,12 @@ class ExcelParser:
         # Mapeo de nombres de columnas comunes
         mapeo_columnas = {
             'codigo': ['código', 'code', 'id', 'producto_id', 'cod', 'ref', 'modelo'],
-            'nombre': ['descripción', 'descripcion', 'producto', 'name', 'desc', 'descrip', 'item'],
+            'nombre': ['descripción', 'descripcion', 'descripcion', 'producto', 'name', 'desc', 'descrip', 'item'],
             'capacidad': ['ah', 'amperaje', 'capacidad_ah', 'cap', 'amperes'],
             'marca': ['brand', 'fabricante', 'marca', 'make'],
             'categoria': ['tipo', 'tipo_canal', 'categoria', 'category', 'channel', 'tipo_venta', 'rubro', 'subrubro'],
             'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost', 'precio_lista', 'precio lista', 'precio lista'],
-            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico', 'pvp', 'pvp on line', 'pvp online', 'pvp on line'],
+            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico', 'pvp', 'pvp on line', 'pvp online', 'pvp on line', 'pvp on line'],
             'stock': ['stock', 'cantidad', 'quantity', 'disponible', 'inventario', 'q_pallet', 'q. pallet', 'inner', 'master', 'q. pallet']
         }
         
@@ -85,11 +85,11 @@ class ExcelParser:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'codigo'
                     logger.info(f"  -> Mapeada a 'codigo'")
-            elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower or 'descripcion' in col_lower:
+            elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower or 'descripcion' in col_lower or 'descripción' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'nombre'
                     logger.info(f"  -> Mapeada a 'nombre'")
-            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower or 'pvp' in col_lower or 'lista' in col_lower:
+            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower or 'pvp' in col_lower or 'lista' in col_lower or 'precio lista' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'precio_base'
                     logger.info(f"  -> Mapeada a 'precio_base'")
