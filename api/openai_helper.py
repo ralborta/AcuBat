@@ -1,268 +1,189 @@
 import os
-import openai
-from typing import List, Optional, Dict
-from .models import Producto, TipoAlerta
 import logging
-from dotenv import load_dotenv
-
-load_dotenv()
+from typing import Optional, List
+from .models import Producto, TipoAlerta
+import openai
 
 logger = logging.getLogger(__name__)
 
 class OpenAIHelper:
     def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        # Configurar API key de OpenAI
+        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.client = None
+        
         if self.api_key:
-            openai.api_key = self.api_key
-            self.disponible = True
+            try:
+                self.client = openai.OpenAI(api_key=self.api_key)
+                logger.info("Cliente OpenAI configurado correctamente")
+            except Exception as e:
+                logger.error(f"Error configurando cliente OpenAI: {e}")
+                self.client = None
         else:
-            logger.warning("OpenAI API key no encontrada. Las funciones de IA estarán deshabilitadas.")
-            self.disponible = False
+            logger.warning("OPENAI_API_KEY no encontrada en variables de entorno")
 
     def analizar_producto(self, producto: Producto) -> Optional[str]:
-        """Analiza un producto usando OpenAI y retorna sugerencias"""
-        if not self.disponible:
+        """Analiza un producto individual usando OpenAI"""
+        if not self.client:
             return None
         
         try:
+            # Preparar prompt para análisis
             prompt = self._crear_prompt_analisis(producto)
             
-            response = openai.ChatCompletion.create(
+            # Llamar a OpenAI
+            response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Eres un experto en análisis de productos y precios. Analiza el producto y proporciona sugerencias breves y útiles."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "Eres un experto en análisis de precios y márgenes comerciales. Analiza los productos y proporciona sugerencias concisas y útiles."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
                 ],
                 max_tokens=200,
+                temperature=0.3
+            )
+            
+            sugerencia = response.choices[0].message.content.strip()
+            logger.info(f"Análisis OpenAI para {producto.codigo}: {sugerencia[:50]}...")
+            
+            return sugerencia
+            
+        except Exception as e:
+            logger.error(f"Error en análisis OpenAI para {producto.codigo}: {e}")
+            return None
+
+    def analizar_lote_productos(self, productos: List[Producto]) -> List[Producto]:
+        """Analiza un lote de productos usando OpenAI"""
+        if not self.client:
+            logger.warning("OpenAI no disponible, saltando análisis")
+            return productos
+        
+        productos_analizados = []
+        
+        for producto in productos:
+            try:
+                # Solo analizar productos con alertas o márgenes extremos
+                if producto.alertas or producto.margen < 10 or producto.margen > 80:
+                    sugerencia = self.analizar_producto(producto)
+                    if sugerencia:
+                        producto.sugerencias_ai = sugerencia
+                
+                productos_analizados.append(producto)
+                
+            except Exception as e:
+                logger.error(f"Error analizando producto {producto.codigo}: {e}")
+                productos_analizados.append(producto)
+        
+        logger.info(f"Analizados {len(productos_analizados)} productos con OpenAI")
+        return productos_analizados
+
+    def _crear_prompt_analisis(self, producto: Producto) -> str:
+        """Crea el prompt para análisis de OpenAI"""
+        alertas_texto = ", ".join(producto.alertas) if producto.alertas else "Sin alertas"
+        
+        prompt = f"""
+Analiza este producto y proporciona una sugerencia concisa:
+
+**Producto:**
+- Código: {producto.codigo}
+- Descripción: {producto.nombre}
+- Marca: {producto.marca.value}
+- Canal: {producto.canal.value}
+- Precio base: ${producto.precio_base:,.2f}
+- Precio final: ${producto.precio_final:,.2f}
+- Margen: {producto.margen:.1f}%
+- Alertas: {alertas_texto}
+
+**Preguntas:**
+1. ¿Este precio parece correcto para el canal y la marca?
+2. ¿Hay indicios de que el markup aplicado es excesivo o insuficiente?
+3. ¿Qué sugerencia darías para optimizar el precio?
+
+Responde de forma concisa (máximo 2-3 líneas) y práctica.
+"""
+        return prompt
+
+    def generar_resumen_analisis(self, productos: List[Producto]) -> str:
+        """Genera un resumen de análisis para todos los productos"""
+        if not self.client:
+            return "Análisis OpenAI no disponible"
+        
+        try:
+            # Preparar datos para resumen
+            total_productos = len(productos)
+            productos_con_alertas = len([p for p in productos if p.alertas])
+            margen_promedio = sum(p.margen for p in productos) / total_productos if productos else 0
+            
+            # Contar alertas por tipo
+            alertas_por_tipo = {}
+            for producto in productos:
+                for alerta in producto.alertas:
+                    alertas_por_tipo[alerta] = alertas_por_tipo.get(alerta, 0) + 1
+            
+            # Resumen por marca
+            resumen_marcas = {}
+            for producto in productos:
+                marca = producto.marca.value
+                if marca not in resumen_marcas:
+                    resumen_marcas[marca] = {'total': 0, 'con_alertas': 0, 'margen_promedio': 0}
+                resumen_marcas[marca]['total'] += 1
+                if producto.alertas:
+                    resumen_marcas[marca]['con_alertas'] += 1
+                resumen_marcas[marca]['margen_promedio'] += producto.margen
+            
+            # Calcular promedios por marca
+            for marca in resumen_marcas:
+                total = resumen_marcas[marca]['total']
+                if total > 0:
+                    resumen_marcas[marca]['margen_promedio'] = round(resumen_marcas[marca]['margen_promedio'] / total, 1)
+            
+            prompt = f"""
+Genera un resumen ejecutivo del análisis de precios:
+
+**Estadísticas generales:**
+- Total productos: {total_productos}
+- Productos con alertas: {productos_con_alertas}
+- Margen promedio: {margen_promedio:.1f}%
+
+**Alertas por tipo:**
+{chr(10).join([f"- {alerta}: {cantidad}" for alerta, cantidad in alertas_por_tipo.items()])}
+
+**Resumen por marca:**
+{chr(10).join([f"- {marca}: {data['total']} productos, {data['con_alertas']} alertas, margen {data['margen_promedio']}%" for marca, data in resumen_marcas.items()])}
+
+**Recomendaciones principales:**
+Proporciona 2-3 recomendaciones clave para optimizar la estrategia de precios.
+
+Responde de forma ejecutiva y práctica.
+"""
+            
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Eres un consultor experto en estrategia de precios. Proporciona análisis ejecutivos y recomendaciones prácticas."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=300,
                 temperature=0.3
             )
             
             return response.choices[0].message.content.strip()
             
         except Exception as e:
-            logger.error(f"Error al analizar producto con OpenAI: {e}")
-            return None
-
-    def analizar_lista_productos(self, productos: List[Producto]) -> Dict[str, str]:
-        """Analiza una lista de productos y retorna sugerencias para cada uno"""
-        if not self.disponible:
-            return {}
-        
-        sugerencias = {}
-        
-        for producto in productos:
-            sugerencia = self.analizar_producto(producto)
-            if sugerencia:
-                sugerencias[producto.codigo] = sugerencia
-        
-        return sugerencias
-
-    def detectar_anomalias(self, productos: List[Producto]) -> List[Dict]:
-        """Detecta anomalías en la lista de productos"""
-        if not self.disponible:
-            return []
-        
-        try:
-            # Crear resumen de productos para análisis
-            resumen = self._crear_resumen_productos(productos)
-            
-            prompt = f"""
-            Analiza la siguiente lista de productos y detecta anomalías o problemas:
-
-            {resumen}
-
-            Identifica:
-            1. Productos con precios inusuales
-            2. Márgenes inconsistentes
-            3. Productos mal clasificados
-            4. Posibles errores en códigos o nombres
-
-            Responde en formato JSON con la estructura:
-            [
-                {{
-                    "tipo": "precio_inusual|margen_inconsistente|clasificacion_erronea|error_datos",
-                    "producto_codigo": "CODIGO",
-                    "descripcion": "Descripción del problema",
-                    "severidad": "baja|media|alta",
-                    "sugerencia": "Sugerencia de corrección"
-                }}
-            ]
-            """
-            
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en detección de anomalías en datos de productos. Responde solo en formato JSON válido."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=500,
-                temperature=0.2
-            )
-            
-            import json
-            try:
-                anomalias = json.loads(response.choices[0].message.content)
-                return anomalias
-            except json.JSONDecodeError:
-                logger.error("Error al parsear respuesta JSON de OpenAI")
-                return []
-                
-        except Exception as e:
-            logger.error(f"Error al detectar anomalías: {e}")
-            return []
-
-    def sugerir_markup(self, producto: Producto, contexto_mercado: str = "") -> Optional[Dict]:
-        """Sugiere markup óptimo para un producto"""
-        if not self.disponible:
-            return None
-        
-        try:
-            prompt = f"""
-            Analiza el siguiente producto y sugiere un markup óptimo:
-
-            Producto: {producto.nombre}
-            Código: {producto.codigo}
-            Marca: {producto.marca.value}
-            Canal: {producto.canal.value}
-            Precio base: ${producto.precio_base:.2f}
-            Precio actual: ${producto.precio_final:.2f}
-            Margen actual: {producto.margen:.1f}%
-
-            Contexto del mercado: {contexto_mercado}
-
-            Sugiere:
-            1. Markup recomendado (%)
-            2. Precio final sugerido
-            3. Justificación breve
-
-            Responde en formato JSON:
-            {{
-                "markup_recomendado": 35.0,
-                "precio_sugerido": 135.00,
-                "justificacion": "Markup estándar para minoristas en este rango de precio"
-            }}
-            """
-            
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en estrategia de precios. Responde solo en formato JSON válido."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=200,
-                temperature=0.3
-            )
-            
-            import json
-            try:
-                sugerencia = json.loads(response.choices[0].message.content)
-                return sugerencia
-            except json.JSONDecodeError:
-                logger.error("Error al parsear sugerencia de markup")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error al sugerir markup: {e}")
-            return None
-
-    def clasificar_producto(self, nombre: str, codigo: str = "") -> Optional[Dict]:
-        """Clasifica automáticamente un producto"""
-        if not self.disponible:
-            return None
-        
-        try:
-            prompt = f"""
-            Clasifica el siguiente producto:
-
-            Nombre: {nombre}
-            Código: {codigo}
-
-            Determina:
-            1. Marca más probable (moura, acubat, lubeck, solar)
-            2. Canal recomendado (minorista, mayorista, distribuidor)
-            3. Capacidad estimada en Ah
-            4. Rango de precio esperado
-
-            Responde en formato JSON:
-            {{
-                "marca": "moura",
-                "canal": "minorista",
-                "capacidad": "60 Ah",
-                "rango_precio": {{"min": 80, "max": 120}},
-                "confianza": 0.85
-            }}
-            """
-            
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en clasificación de productos de baterías. Responde solo en formato JSON válido."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=200,
-                temperature=0.2
-            )
-            
-            import json
-            try:
-                clasificacion = json.loads(response.choices[0].message.content)
-                return clasificacion
-            except json.JSONDecodeError:
-                logger.error("Error al parsear clasificación")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error al clasificar producto: {e}")
-            return None
-
-    def _crear_prompt_analisis(self, producto: Producto) -> str:
-        """Crea el prompt para análisis de un producto individual"""
-        alertas_texto = ", ".join([alerta.value for alerta in producto.alertas]) if producto.alertas else "Ninguna"
-        
-        return f"""
-        Analiza este producto de batería:
-
-        Código: {producto.codigo}
-        Nombre: {producto.nombre}
-        Capacidad: {producto.capacidad or 'No especificada'}
-        Marca: {producto.marca.value}
-        Canal: {producto.canal.value}
-        Precio base: ${producto.precio_base:.2f}
-        Precio final: ${producto.precio_final:.2f}
-        Margen: {producto.margen:.1f}%
-        Alertas: {alertas_texto}
-
-        Proporciona una sugerencia breve (máximo 2 líneas) sobre:
-        - Si el precio está bien posicionado
-        - Si hay algún problema evidente
-        - Sugerencia de mejora si aplica
-
-        Responde de forma concisa y práctica.
-        """
-
-    def _crear_resumen_productos(self, productos: List[Producto]) -> str:
-        """Crea un resumen de productos para análisis masivo"""
-        resumen = f"Total de productos: {len(productos)}\n\n"
-        
-        # Agrupar por marca
-        por_marca = {}
-        for producto in productos:
-            marca = producto.marca.value
-            if marca not in por_marca:
-                por_marca[marca] = []
-            por_marca[marca].append(producto)
-        
-        for marca, productos_marca in por_marca.items():
-            resumen += f"Marca {marca}: {len(productos_marca)} productos\n"
-            precios = [p.precio_final for p in productos_marca]
-            margenes = [p.margen for p in productos_marca]
-            
-            resumen += f"  - Precio promedio: ${sum(precios)/len(precios):.2f}\n"
-            resumen += f"  - Margen promedio: {sum(margenes)/len(margenes):.1f}%\n"
-            resumen += f"  - Productos con alertas: {len([p for p in productos_marca if p.alertas])}\n\n"
-        
-        return resumen
+            logger.error(f"Error generando resumen de análisis: {e}")
+            return f"Error generando resumen: {str(e)}"
 
     def esta_disponible(self) -> bool:
         """Verifica si OpenAI está disponible"""
-        return self.disponible 
+        return self.client is not None and self.api_key is not None 

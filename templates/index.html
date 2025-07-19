@@ -98,7 +98,7 @@
 
                 <!-- Stats Cards -->
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <div class="card stats-card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
@@ -111,7 +111,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <div class="card stats-card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
@@ -124,7 +124,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <div class="card stats-card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
@@ -143,15 +143,47 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Exportar</h6>
+                                        <button class="btn btn-light btn-sm" onclick="exportarCSV()">
+                                            <i class="fas fa-download me-1"></i>
+                                            CSV
+                                        </button>
+                                    </div>
+                                    <i class="fas fa-file-csv fa-2x opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">Análisis IA</h6>
+                                        <button class="btn btn-light btn-sm" onclick="analizarConIA()">
+                                            <i class="fas fa-brain me-1"></i>
+                                            Analizar
+                                        </button>
+                                    </div>
+                                    <i class="fas fa-chart-line fa-2x opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
                         <div class="card stats-card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between">
                                     <div>
                                         <h6 class="card-title">Acciones</h6>
-                                        <button class="btn btn-light btn-sm" onclick="analizarConIA()">
-                                            <i class="fas fa-brain me-1"></i>
-                                            Analizar IA
+                                        <button class="btn btn-light btn-sm" onclick="limpiarDatos()">
+                                            <i class="fas fa-trash me-1"></i>
+                                            Limpiar
                                         </button>
                                     </div>
                                     <i class="fas fa-cogs fa-2x opacity-50"></i>
@@ -160,6 +192,50 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Resúmenes por Marca y Canal -->
+                {% if resumen_marcas or resumen_canales %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-tags me-2"></i>Resumen por Marca</h6>
+                            </div>
+                            <div class="card-body">
+                                {% for marca, datos in resumen_marcas.items() %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-secondary">{{ marca.upper() }}</span>
+                                    <div class="text-end">
+                                        <small class="text-muted">{{ datos.total }} productos</small><br>
+                                        <small class="text-warning">{{ datos.con_alertas }} alertas</small><br>
+                                        <small class="text-info">Margen: {{ datos.margen_promedio }}%</small>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Resumen por Canal</h6>
+                            </div>
+                            <div class="card-body">
+                                {% for canal, datos in resumen_canales.items() %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-info">{{ canal.upper() }}</span>
+                                    <div class="text-end">
+                                        <small class="text-muted">{{ datos.total }} productos</small><br>
+                                        <small class="text-warning">{{ datos.con_alertas }} alertas</small><br>
+                                        <small class="text-info">Margen: {{ datos.margen_promedio }}%</small>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <!-- Upload Section -->
                 <div class="card mb-4">
@@ -244,14 +320,15 @@
                                 <thead>
                                     <tr>
                                         <th>Código</th>
-                                        <th>Nombre</th>
-                                        <th>Capacidad</th>
+                                        <th>Descripción</th>
                                         <th>Marca</th>
                                         <th>Canal</th>
                                         <th>Precio Base</th>
                                         <th>Precio Final</th>
-                                        <th>Margen</th>
+                                        <th>Markup %</th>
+                                        <th>Margen %</th>
                                         <th>Estado</th>
+                                        <th>IA</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -264,43 +341,70 @@
                                                 <i class="fas fa-exclamation-circle text-warning ms-1"></i>
                                             {% endif %}
                                         </td>
-                                        <td>{{ producto.nombre }}</td>
-                                        <td>{{ producto.capacidad or 'N/A' }}</td>
                                         <td>
-                                            <span class="badge bg-secondary">{{ producto.marca.value }}</span>
+                                            <div class="small">{{ producto.nombre }}</div>
+                                            {% if producto.capacidad %}
+                                                <small class="text-muted">{{ producto.capacidad }}</small>
+                                            {% endif %}
                                         </td>
                                         <td>
-                                            <span class="badge bg-info">{{ producto.canal.value }}</span>
+                                            <span class="badge bg-secondary">{{ producto.marca.value.upper() }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ producto.canal.value.upper() }}</span>
                                         </td>
                                         <td>${{ "%.2f"|format(producto.precio_base) }}</td>
                                         <td>${{ "%.2f"|format(producto.precio_final) }}</td>
-                                        <td>{{ "%.1f"|format(producto.margen) }}%</td>
+                                        <td>
+                                            {% if producto.markup_aplicado %}
+                                                {{ "%.1f"|format(producto.markup_aplicado) }}%
+                                            {% else %}
+                                                {% set markup = ((producto.precio_final - producto.precio_base) / producto.precio_base * 100) if producto.precio_base > 0 else 0 %}
+                                                {{ "%.1f"|format(markup) }}%
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if producto.margen < 10 %}bg-danger{% elif producto.margen > 80 %}bg-warning{% else %}bg-success{% endif %}">
+                                                {{ "%.1f"|format(producto.margen) }}%
+                                            </span>
+                                        </td>
                                         <td>
                                             {% if producto.alertas %}
                                                 {% for alerta in producto.alertas %}
                                                     {% if alerta.value == 'margen_bajo' %}
-                                                        <span class="badge status-low-margin">Low margin</span>
+                                                        <span class="badge bg-danger">Bajo margen</span>
                                                     {% elif alerta.value == 'sin_codigo' %}
-                                                        <span class="badge status-inactive">Inactive</span>
+                                                        <span class="badge bg-warning">Sin código</span>
                                                     {% elif alerta.value == 'precio_liberado' %}
-                                                        <span class="badge status-low-rank">Low rank</span>
+                                                        <span class="badge bg-info">Liberado</span>
                                                     {% elif alerta.value == 'sin_markup' %}
-                                                        <span class="badge status-no-markup">No markup</span>
+                                                        <span class="badge bg-secondary">Sin markup</span>
+                                                    {% elif alerta.value == 'precio_fuera_rango' %}
+                                                        <span class="badge bg-warning">Sobreprecio</span>
                                                     {% else %}
                                                         <span class="badge bg-warning">{{ alerta.value }}</span>
                                                     {% endif %}
                                                 {% endfor %}
                                             {% else %}
-                                                <span class="badge status-active">Active</span>
+                                                <span class="badge bg-success">OK</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if producto.sugerencias_ai %}
+                                                <button class="btn btn-outline-success btn-sm" onclick="verSugerenciaIA('{{ producto.codigo }}', '{{ producto.sugerencias_ai|replace("'", "\\'")|replace('"', '\\"') }}')">
+                                                    <i class="fas fa-robot"></i>
+                                                </button>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" onclick="sugerirMarkup('{{ producto.codigo }}')">
-                                                    <i class="fas fa-lightbulb"></i>
-                                                </button>
-                                                <button class="btn btn-outline-info" onclick="verDetalles('{{ producto.codigo }}')">
+                                                <button class="btn btn-outline-primary" onclick="verDetalles('{{ producto.codigo }}')">
                                                     <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-info" onclick="exportarProducto('{{ producto.codigo }}')">
+                                                    <i class="fas fa-download"></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -433,7 +537,7 @@
 
         async function analizarConIA() {
             try {
-                const response = await fetch('/api/analizar-ai', { method: 'POST' });
+                const response = await fetch('/api/analisis-openai');
                 const result = await response.json();
                 
                 if (response.ok) {
@@ -446,28 +550,62 @@
             }
         }
 
+        async function exportarCSV() {
+            try {
+                window.open('/export/csv', '_blank');
+            } catch (error) {
+                alert('Error exportando CSV: ' + error.message);
+            }
+        }
+
         function mostrarResultadosIA(resultado) {
             const modalBody = document.getElementById('aiModalBody');
             let html = '<div class="row">';
             
-            // Sugerencias
-            html += '<div class="col-md-6"><h6>Sugerencias por Producto</h6>';
-            for (const [codigo, sugerencia] of Object.entries(resultado.sugerencias)) {
-                html += `<div class="card mb-2"><div class="card-body"><strong>${codigo}:</strong> ${sugerencia}</div></div>`;
-            }
+            html += '<div class="col-12">';
+            html += '<h6><i class="fas fa-chart-line me-2"></i>Análisis Ejecutivo</h6>';
+            html += '<div class="card mb-3">';
+            html += '<div class="card-body">';
+            html += `<p>${resultado.resumen}</p>`;
+            html += '</div>';
+            html += '</div>';
             html += '</div>';
             
-            // Anomalías
-            html += '<div class="col-md-6"><h6>Anomalías Detectadas</h6>';
-            for (const anomalia of resultado.anomalias) {
-                html += `<div class="card mb-2"><div class="card-body"><strong>${anomalia.tipo}:</strong> ${anomalia.descripcion}</div></div>`;
-            }
+            html += '<div class="col-12">';
+            html += '<h6><i class="fas fa-info-circle me-2"></i>Estadísticas</h6>';
+            html += '<div class="row">';
+            html += `<div class="col-md-4"><div class="card"><div class="card-body text-center"><h4>${resultado.total_productos}</h4><small>Total Productos</small></div></div></div>`;
+            html += `<div class="col-md-4"><div class="card"><div class="card-body text-center"><h4>${resultado.productos_con_alertas}</h4><small>Con Alertas</small></div></div></div>`;
+            html += `<div class="col-md-4"><div class="card"><div class="card-body text-center"><h4>${Math.round((resultado.productos_con_alertas / resultado.total_productos) * 100)}%</h4><small>% Alertas</small></div></div></div>`;
+            html += '</div>';
             html += '</div>';
             
             html += '</div>';
             modalBody.innerHTML = html;
             
             new bootstrap.Modal(document.getElementById('aiModal')).show();
+        }
+
+        function verSugerenciaIA(codigo, sugerencia) {
+            const modalBody = document.getElementById('aiModalBody');
+            let html = '<div class="row">';
+            html += '<div class="col-12">';
+            html += `<h6><i class="fas fa-robot me-2"></i>Sugerencia IA para ${codigo}</h6>`;
+            html += '<div class="card">';
+            html += '<div class="card-body">';
+            html += `<p>${sugerencia}</p>`;
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            
+            modalBody.innerHTML = html;
+            new bootstrap.Modal(document.getElementById('aiModal')).show();
+        }
+
+        function exportarProducto(codigo) {
+            // Implementar exportación individual
+            alert('Exportando producto: ' + codigo);
         }
 
         function sugerirMarkup(codigo) {

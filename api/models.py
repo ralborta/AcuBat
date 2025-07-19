@@ -30,9 +30,11 @@ class Producto(BaseModel):
     precio_base: float
     precio_final: float
     margen: float
+    markup_aplicado: Optional[float] = None  # Porcentaje de markup aplicado
     alertas: List[TipoAlerta] = []
     sugerencias_ai: Optional[str] = None
     fecha_procesamiento: datetime = datetime.now()
+    origen_archivo: Optional[str] = None  # Archivo de origen
 
 class ProductoResponse(BaseModel):
     productos: List[Producto]

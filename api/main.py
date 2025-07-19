@@ -1,7 +1,13 @@
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import logging
+import io
+
+# Importar módulos de la fase 2
+from .logic import PricingLogic
+from .openai_helper import OpenAIHelper
+from .parser import ExcelParser
 
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
@@ -17,19 +23,28 @@ app = FastAPI(
 # Configurar templates
 templates = Jinja2Templates(directory="templates")
 
-# Variable global para almacenar productos procesados
+# Variables globales para almacenar productos procesados
 productos_actuales = []
+pricing_logic = PricingLogic()
+openai_helper = OpenAIHelper()
+excel_parser = ExcelParser()
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Página principal con panel de productos"""
     try:
+        # Generar resúmenes
+        resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_actuales) if productos_actuales else {}
+        resumen_canales = pricing_logic.obtener_resumen_canales(productos_actuales) if productos_actuales else {}
+        
         return templates.TemplateResponse("index.html", {
             "request": request,
             "productos": productos_actuales if productos_actuales else [],
             "total_productos": len(productos_actuales) if productos_actuales else 0,
-            "productos_con_alertas": len([p for p in productos_actuales if p.get('alertas')]) if productos_actuales else 0,
-            "openai_disponible": False
+            "productos_con_alertas": len([p for p in productos_actuales if p.alertas]) if productos_actuales else 0,
+            "openai_disponible": openai_helper.esta_disponible(),
+            "resumen_marcas": resumen_marcas,
+            "resumen_canales": resumen_canales
         })
     except Exception as e:
         logger.error(f"Error en página principal: {e}")
@@ -73,11 +88,11 @@ async def alertas(request: Request):
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """Endpoint para subir archivo Excel"""
+    """Endpoint para subir archivo Excel y procesar con pricing"""
     try:
         # Verificar que sea un archivo Excel
-        if not file.filename.endswith(('.xlsx', '.xls')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls)")
+        if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) o CSV (.csv)")
         
         # Leer el archivo
         contenido = file.file.read()
@@ -85,34 +100,52 @@ async def upload_file(file: UploadFile = File(...)):
         if not contenido:
             raise HTTPException(status_code=400, detail="El archivo está vacío")
         
-        # Simular procesamiento básico (sin pandas por ahora)
-        # En una implementación real, aquí procesaríamos el Excel
-        productos_procesados = 70  # Simular 70 productos
-        productos_con_alertas = 5  # Simular 5 con alertas
+        # Guardar archivo temporalmente
+        import tempfile
+        import os
         
-        # Crear productos de ejemplo
-        global productos_actuales
-        productos_actuales = [
-            {
-                "codigo": f"PROD_{i:03d}",
-                "nombre": f"Producto {i}",
-                "precio": 100 + i * 10,
-                "marca": "LÜSQTOFF" if i % 3 == 0 else "BLACK SERIES",
-                "canal": "minorista" if i % 2 == 0 else "mayorista",
-                "capacidad": f"{50 + i} Ah",
-                "precio_base": 100 + i * 10,
-                "precio_final": 150 + i * 15,
-                "margen": 25.0 + (i % 10),
-                "alertas": ["margen_bajo"] if i % 7 == 0 else []
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Procesar archivo con el parser
+            productos = excel_parser.leer_excel(temp_file_path)
+            
+            if not productos:
+                raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
+            
+            # Aplicar pricing logic
+            productos_procesados = pricing_logic.procesar_productos(productos)
+            
+            # Analizar con OpenAI si está disponible
+            if openai_helper.esta_disponible():
+                productos_analizados = openai_helper.analizar_lote_productos(productos_procesados)
+                productos_procesados = productos_analizados
+            
+            # Actualizar productos globales
+            global productos_actuales
+            productos_actuales = productos_procesados
+            
+            # Generar resúmenes
+            resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_procesados)
+            resumen_canales = pricing_logic.obtener_resumen_canales(productos_procesados)
+            
+            productos_con_alertas = len([p for p in productos_procesados if p.alertas])
+            
+            return {
+                "mensaje": "Archivo procesado exitosamente con pricing",
+                "productos_procesados": len(productos_procesados),
+                "productos_con_alertas": productos_con_alertas,
+                "resumen_marcas": resumen_marcas,
+                "resumen_canales": resumen_canales,
+                "openai_utilizado": openai_helper.esta_disponible()
             }
-            for i in range(1, productos_procesados + 1)
-        ]
-        
-        return {
-            "mensaje": "Archivo procesado exitosamente",
-            "productos_procesados": productos_procesados,
-            "productos_con_alertas": productos_con_alertas
-        }
+            
+        finally:
+            # Limpiar archivo temporal
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
         
     except HTTPException:
         raise
@@ -132,4 +165,90 @@ async def get_status():
 @app.get("/health")
 async def health_check():
     """Health check para verificar que la aplicación funciona"""
-    return {"status": "healthy", "message": "Backend Acubat funcionando"} 
+    return {"status": "healthy", "message": "Backend Acubat funcionando"}
+
+@app.get("/export/csv")
+async def export_csv():
+    """Exporta los productos actuales a CSV"""
+    try:
+        if not productos_actuales:
+            raise HTTPException(status_code=404, detail="No hay productos para exportar")
+        
+        csv_content = pricing_logic.exportar_a_csv(productos_actuales)
+        
+        # Crear respuesta de streaming
+        csv_io = io.StringIO(csv_content)
+        
+        return StreamingResponse(
+            iter([csv_io.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=productos_pricing.csv"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exportando CSV: {e}")
+        raise HTTPException(status_code=500, detail=f"Error exportando CSV: {str(e)}")
+
+@app.get("/api/analisis-openai")
+async def obtener_analisis_openai():
+    """Obtiene análisis de OpenAI para los productos actuales"""
+    try:
+        if not productos_actuales:
+            raise HTTPException(status_code=404, detail="No hay productos para analizar")
+        
+        if not openai_helper.esta_disponible():
+            raise HTTPException(status_code=503, detail="OpenAI no está disponible")
+        
+        resumen = openai_helper.generar_resumen_analisis(productos_actuales)
+        
+        return {
+            "resumen": resumen,
+            "total_productos": len(productos_actuales),
+            "productos_con_alertas": len([p for p in productos_actuales if p.alertas])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo análisis OpenAI: {e}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo análisis: {str(e)}")
+
+@app.get("/api/filtrar")
+async def filtrar_productos(
+    canal: str = None,
+    marca: str = None,
+    con_alertas: bool = None
+):
+    """Filtra productos según criterios"""
+    try:
+        if not productos_actuales:
+            return {"productos": [], "total": 0}
+        
+        productos_filtrados = productos_actuales.copy()
+        
+        # Filtrar por canal
+        if canal:
+            productos_filtrados = [p for p in productos_filtrados if p.canal.value == canal.lower()]
+        
+        # Filtrar por marca
+        if marca:
+            productos_filtrados = [p for p in productos_filtrados if p.marca.value == marca.lower()]
+        
+        # Filtrar por alertas
+        if con_alertas is not None:
+            if con_alertas:
+                productos_filtrados = [p for p in productos_filtrados if p.alertas]
+            else:
+                productos_filtrados = [p for p in productos_filtrados if not p.alertas]
+        
+        return {
+            "productos": productos_filtrados,
+            "total": len(productos_filtrados),
+            "filtros_aplicados": {
+                "canal": canal,
+                "marca": marca,
+                "con_alertas": con_alertas
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error filtrando productos: {e}")
+        raise HTTPException(status_code=500, detail=f"Error filtrando productos: {str(e)}") 
