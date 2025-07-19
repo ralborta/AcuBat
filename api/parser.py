@@ -91,11 +91,24 @@ class ExcelParser:
 
     def convertir_dataframe_a_productos(self, df: pd.DataFrame) -> List[Producto]:
         """Convierte un DataFrame directamente a productos (para Vercel)"""
-        # Normalizar columnas
-        df = self.normalizar_columnas(df)
-        
-        # Convertir a productos
-        return self.convertir_a_productos(df)
+        try:
+            # Verificar que el DataFrame tenga datos
+            if df.empty:
+                logger.warning("DataFrame vacío recibido")
+                return []
+            
+            # Normalizar columnas
+            df = self.normalizar_columnas(df)
+            
+            # Convertir a productos
+            productos = self.convertir_a_productos(df)
+            
+            logger.info(f"Convertidos {len(productos)} productos del DataFrame")
+            return productos
+            
+        except Exception as e:
+            logger.error(f"Error convirtiendo DataFrame a productos: {e}")
+            return []
 
     def fila_a_producto(self, row: pd.Series, index: int) -> Optional[Producto]:
         """Convierte una fila del DataFrame a un objeto Producto"""

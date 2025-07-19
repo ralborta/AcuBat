@@ -71,27 +71,40 @@ async def upload_file(file: UploadFile = File(...)):
         # En Vercel, usar memoria en lugar de archivos temporales
         import io
         
-        # Leer el archivo directamente desde memoria
-        contenido = file.file.read()
-        
-        # Crear un buffer en memoria
-        buffer = io.BytesIO(contenido)
-        
-        # Procesar archivo desde memoria
         try:
+            # Leer el archivo directamente desde memoria
+            contenido = file.file.read()
+            
+            # Crear un buffer en memoria
+            buffer = io.BytesIO(contenido)
+            
+            # Procesar archivo desde memoria
             import pandas as pd
             df = pd.read_excel(buffer)
             
+            # Verificar que el DataFrame no esté vacío
+            if df.empty:
+                raise HTTPException(status_code=400, detail="El archivo Excel está vacío")
+            
             # Convertir DataFrame a productos usando el parser
             productos = parser.convertir_dataframe_a_productos(df)
+            
+            if not productos:
+                raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
+            
             productos_procesados = logica.procesar_productos(productos)
             
             # Actualizar productos globales
             global productos_actuales
             productos_actuales = productos_procesados
             
+        except pd.errors.EmptyDataError:
+            raise HTTPException(status_code=400, detail="El archivo Excel está vacío o no tiene datos válidos")
+        except pd.errors.ParserError:
+            raise HTTPException(status_code=400, detail="El archivo no es un Excel válido")
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error al procesar Excel: {str(e)}")
+            logger.error(f"Error procesando archivo: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Error al procesar archivo: {str(e)}")
         
         return {
             "mensaje": "Archivo procesado exitosamente",
