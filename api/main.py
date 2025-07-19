@@ -3,7 +3,11 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import logging
 import io
-import os
+
+# Importar módulos de la fase 2
+from .logic import PricingLogic
+from .openai_helper import OpenAIHelper
+from .parser import ExcelParser
 
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
@@ -21,67 +25,24 @@ templates = Jinja2Templates(directory="templates")
 
 # Variables globales para almacenar productos procesados
 productos_actuales = []
-
-# Importar módulos de forma segura
-try:
-    from .logic import PricingLogic
-    from .openai_helper import OpenAIHelper
-    from .parser import ExcelParser
-    
-    pricing_logic = PricingLogic()
-    openai_helper = OpenAIHelper()
-    excel_parser = ExcelParser()
-    
-    MODULES_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Algunos módulos no están disponibles: {e}")
-    MODULES_AVAILABLE = False
+pricing_logic = PricingLogic()
+openai_helper = OpenAIHelper()
+excel_parser = ExcelParser()
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Página principal con panel de productos"""
     try:
-        if not MODULES_AVAILABLE:
-            return HTMLResponse(content="""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Acubat - Sistema de Pricing</title>
-                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-            </head>
-            <body>
-                <div class="container mt-5">
-                    <h1>🚀 AcuBat - Sistema de Pricing Inteligente</h1>
-                    <div class="alert alert-warning">
-                        <h4>⚠️ Sistema en Modo Básico</h4>
-                        <p>Algunos módulos no están disponibles en este entorno. El sistema funciona en modo básico.</p>
-                    </div>
-                    <div class="card">
-                        <div class="card-body">
-                            <h5>✅ Funcionalidades Disponibles:</h5>
-                            <ul>
-                                <li>✅ Health Check del sistema</li>
-                                <li>✅ Verificación de estado</li>
-                                <li>⚠️ Procesamiento de archivos (limitado)</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <a href="/health" class="btn btn-primary">Verificar Estado</a>
-                </div>
-            </body>
-            </html>
-            """)
-        
-        # Generar resúmenes si los módulos están disponibles
-        resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_actuales) if productos_actuales and MODULES_AVAILABLE else {}
-        resumen_canales = pricing_logic.obtener_resumen_canales(productos_actuales) if productos_actuales and MODULES_AVAILABLE else {}
+        # Generar resúmenes
+        resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_actuales) if productos_actuales else {}
+        resumen_canales = pricing_logic.obtener_resumen_canales(productos_actuales) if productos_actuales else {}
         
         return templates.TemplateResponse("index.html", {
             "request": request,
             "productos": productos_actuales if productos_actuales else [],
             "total_productos": len(productos_actuales) if productos_actuales else 0,
             "productos_con_alertas": len([p for p in productos_actuales if p.alertas]) if productos_actuales else 0,
-            "openai_disponible": openai_helper.esta_disponible() if MODULES_AVAILABLE else False,
+            "openai_disponible": openai_helper.esta_disponible(),
             "resumen_marcas": resumen_marcas,
             "resumen_canales": resumen_canales
         })
@@ -91,54 +52,47 @@ async def index(request: Request):
         return HTMLResponse(content=f"""
         <!DOCTYPE html>
         <html>
-        <head>
-            <title>Acubat - Error</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        </head>
+        <head><title>Acubat - Error</title></head>
         <body>
-            <div class="container mt-5">
-                <h1>🚀 Backend Acubat</h1>
-                <div class="alert alert-danger">
-                    <h4>❌ Error cargando la página</h4>
-                    <p>{str(e)}</p>
-                </div>
-                <p>Productos cargados: {len(productos_actuales) if productos_actuales else 0}</p>
-                <a href="/health" class="btn btn-primary">Health Check</a>
-            </div>
+            <h1>Backend Acubat</h1>
+            <p>Error cargando la página: {str(e)}</p>
+            <p>Productos cargados: {len(productos_actuales) if productos_actuales else 0}</p>
+            <a href="/health">Health Check</a>
         </body>
         </html>
         """)
 
-@app.get("/health")
-async def health_check():
-    """Health check para verificar que la aplicación funciona"""
-    return {
-        "status": "healthy", 
-        "message": "Backend Acubat funcionando",
-        "modules_available": MODULES_AVAILABLE,
-        "productos_cargados": len(productos_actuales) if productos_actuales else 0
-    }
-
-@app.get("/api/status")
-async def get_status():
-    """Obtiene el estado del sistema"""
-    return {
-        "status": "ok",
-        "mensaje": "Aplicación funcionando correctamente",
-        "productos_cargados": len(productos_actuales) if productos_actuales else 0,
-        "modules_available": MODULES_AVAILABLE
-    }
+@app.get("/alertas", response_class=HTMLResponse)
+async def alertas(request: Request):
+    """Página de alertas"""
+    try:
+        productos_con_alertas = [p for p in productos_actuales if p.get('alertas')] if productos_actuales else []
+        return templates.TemplateResponse("alertas.html", {
+            "request": request,
+            "productos": productos_con_alertas,
+            "total_alertas": len(productos_con_alertas)
+        })
+    except Exception as e:
+        logger.error(f"Error en página de alertas: {e}")
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Acubat - Alertas</title></head>
+        <body>
+            <h1>Alertas</h1>
+            <p>Error cargando alertas: {str(e)}</p>
+            <a href="/">Volver al inicio</a>
+        </body>
+        </html>
+        """)
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     """Endpoint para subir archivo Excel y procesar con pricing"""
     try:
-        if not MODULES_AVAILABLE:
-            raise HTTPException(status_code=503, detail="Sistema en modo básico. Módulos de procesamiento no disponibles.")
-        
         # Verificar que sea un archivo soportado
-        if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) o CSV (.csv)")
+        if not file.filename.endswith(('.xlsx', '.xls', '.csv', '.pdf')):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls), CSV (.csv) o PDF (.pdf)")
         
         # Leer el archivo
         contenido = file.file.read()
@@ -148,14 +102,42 @@ async def upload_file(file: UploadFile = File(...)):
         
         # Guardar archivo temporalmente
         import tempfile
+        import os
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
             temp_file.write(contenido)
             temp_file_path = temp_file.name
         
         try:
-            # Procesar archivo Excel/CSV
-            productos = excel_parser.leer_excel(temp_file_path)
+            # Verificar si es un PDF y convertirlo
+            if file.filename.endswith('.pdf'):
+                logger.info(f"Detectado archivo PDF: {file.filename}")
+                
+                # Importar convertidor PDF Lite para Vercel
+                try:
+                    from pdf_converter import PDFConverter
+                    pdf_converter = PDFConverter()
+                except ImportError:
+                    # Fallback a versión lite si las dependencias pesadas no están disponibles
+                    from .pdf_converter_lite import PDFConverterLite
+                    pdf_converter = PDFConverterLite()
+                
+                # Convertir PDF a Excel
+                excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)
+                
+                if excel_path:
+                    logger.info(f"PDF convertido exitosamente a: {excel_path}")
+                    # Usar el archivo Excel convertido
+                    productos = excel_parser.leer_excel(excel_path)
+                    
+                    # Limpiar archivo temporal Excel
+                    if os.path.exists(excel_path):
+                        os.unlink(excel_path)
+                else:
+                    raise HTTPException(status_code=400, detail="No se pudo convertir el PDF. Verifica que contenga tablas o texto estructurado.")
+            else:
+                # Procesar archivo Excel/CSV directamente
+                productos = excel_parser.leer_excel(temp_file_path)
             
             if not productos:
                 raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
@@ -178,14 +160,18 @@ async def upload_file(file: UploadFile = File(...)):
             
             productos_con_alertas = len([p for p in productos_procesados if p.alertas])
             
+            # Determinar tipo de archivo procesado
+            archivo_tipo = "PDF convertido" if file.filename.endswith('.pdf') else "Excel/CSV"
+            
             return {
-                "mensaje": "Archivo procesado exitosamente con pricing",
+                "mensaje": f"Archivo {archivo_tipo} procesado exitosamente con pricing",
                 "productos_procesados": len(productos_procesados),
                 "productos_con_alertas": productos_con_alertas,
                 "resumen_marcas": resumen_marcas,
                 "resumen_canales": resumen_canales,
                 "openai_utilizado": openai_helper.esta_disponible(),
-                "archivo_original": file.filename
+                "archivo_original": file.filename,
+                "tipo_procesamiento": archivo_tipo
             }
             
         finally:
@@ -199,49 +185,63 @@ async def upload_file(file: UploadFile = File(...)):
         logger.error(f"Error al procesar archivo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
 
+@app.get("/api/status")
+async def get_status():
+    """Obtiene el estado del sistema"""
+    return {
+        "status": "ok",
+        "mensaje": "Aplicación funcionando correctamente",
+        "productos_cargados": len(productos_actuales)
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check para verificar que la aplicación funciona"""
+    return {"status": "healthy", "message": "Backend Acubat funcionando"}
+
 @app.get("/export/csv")
 async def export_csv():
-    """Exportar productos a CSV"""
+    """Exporta los productos actuales a CSV"""
     try:
         if not productos_actuales:
             raise HTTPException(status_code=404, detail="No hay productos para exportar")
         
-        if not MODULES_AVAILABLE:
-            raise HTTPException(status_code=503, detail="Módulo de exportación no disponible")
-        
-        # Crear CSV
         csv_content = pricing_logic.exportar_a_csv(productos_actuales)
         
+        # Crear respuesta de streaming
+        csv_io = io.StringIO(csv_content)
+        
         return StreamingResponse(
-            io.StringIO(csv_content),
+            iter([csv_io.getvalue()]),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=productos_pricing.csv"}
         )
+        
     except Exception as e:
-        logger.error(f"Error al exportar CSV: {e}")
-        raise HTTPException(status_code=500, detail=f"Error al exportar: {str(e)}")
+        logger.error(f"Error exportando CSV: {e}")
+        raise HTTPException(status_code=500, detail=f"Error exportando CSV: {str(e)}")
 
 @app.get("/api/analisis-openai")
 async def obtener_analisis_openai():
-    """Obtener análisis de OpenAI de productos actuales"""
+    """Obtiene análisis de OpenAI para los productos actuales"""
     try:
         if not productos_actuales:
             raise HTTPException(status_code=404, detail="No hay productos para analizar")
         
-        if not MODULES_AVAILABLE or not openai_helper.esta_disponible():
-            raise HTTPException(status_code=503, detail="Análisis OpenAI no disponible")
+        if not openai_helper.esta_disponible():
+            raise HTTPException(status_code=503, detail="OpenAI no está disponible")
         
-        # Analizar productos con OpenAI
-        productos_analizados = openai_helper.analizar_lote_productos(productos_actuales)
+        resumen = openai_helper.generar_resumen_analisis(productos_actuales)
         
         return {
-            "mensaje": "Análisis OpenAI completado",
-            "productos_analizados": len(productos_analizados),
-            "sugerencias_generadas": len([p for p in productos_analizados if p.sugerencias_openai])
+            "resumen": resumen,
+            "total_productos": len(productos_actuales),
+            "productos_con_alertas": len([p for p in productos_actuales if p.alertas])
         }
+        
     except Exception as e:
-        logger.error(f"Error en análisis OpenAI: {e}")
-        raise HTTPException(status_code=500, detail=f"Error en análisis: {str(e)}")
+        logger.error(f"Error obteniendo análisis OpenAI: {e}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo análisis: {str(e)}")
 
 @app.get("/api/filtrar")
 async def filtrar_productos(
@@ -249,19 +249,22 @@ async def filtrar_productos(
     marca: str = None,
     con_alertas: bool = None
 ):
-    """Filtrar productos por criterios"""
+    """Filtra productos según criterios"""
     try:
         if not productos_actuales:
             return {"productos": [], "total": 0}
         
         productos_filtrados = productos_actuales.copy()
         
+        # Filtrar por canal
         if canal:
-            productos_filtrados = [p for p in productos_filtrados if p.canal == canal]
+            productos_filtrados = [p for p in productos_filtrados if p.canal.value == canal.lower()]
         
+        # Filtrar por marca
         if marca:
-            productos_filtrados = [p for p in productos_filtrados if p.marca == marca]
+            productos_filtrados = [p for p in productos_filtrados if p.marca.value == marca.lower()]
         
+        # Filtrar por alertas
         if con_alertas is not None:
             if con_alertas:
                 productos_filtrados = [p for p in productos_filtrados if p.alertas]
@@ -277,6 +280,71 @@ async def filtrar_productos(
                 "con_alertas": con_alertas
             }
         }
+        
+            except Exception as e:
+            logger.error(f"Error filtrando productos: {e}")
+            raise HTTPException(status_code=500, detail=f"Error filtrando productos: {str(e)}")
+
+@app.post("/convertir-pdf")
+async def convertir_pdf(file: UploadFile = File(...)):
+    """Endpoint específico para convertir PDFs a Excel"""
+    try:
+        # Verificar que sea un archivo PDF
+        if not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF (.pdf)")
+        
+        # Leer el archivo
+        contenido = file.file.read()
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        # Guardar archivo temporalmente
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Importar convertidor PDF
+            from pdf_converter import PDFConverter
+            pdf_converter = PDFConverter()
+            
+            # Convertir PDF a Excel
+            excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)
+            
+            if excel_path:
+                # Leer el archivo Excel convertido
+                import pandas as pd
+                df = pd.read_excel(excel_path)
+                
+                # Preparar respuesta
+                response_data = {
+                    "mensaje": "PDF convertido exitosamente",
+                    "archivo_original": file.filename,
+                    "archivo_convertido": os.path.basename(excel_path),
+                    "filas_procesadas": len(df),
+                    "columnas": list(df.columns),
+                    "preview": df.head(5).to_dict('records')
+                }
+                
+                # Limpiar archivo temporal Excel
+                if os.path.exists(excel_path):
+                    os.unlink(excel_path)
+                
+                return response_data
+            else:
+                raise HTTPException(status_code=400, detail="No se pudo convertir el PDF. Verifica que contenga tablas o texto estructurado.")
+                
+        finally:
+            # Limpiar archivo temporal PDF
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error al filtrar productos: {e}")
-        raise HTTPException(status_code=500, detail=f"Error al filtrar: {str(e)}") 
+        logger.error(f"Error al convertir PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al convertir PDF: {str(e)}") 

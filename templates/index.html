@@ -443,17 +443,28 @@
             window.location.href = '/export/csv';
         }
 
-        function analizarOpenAI() {
-            fetch('/api/analisis-openai')
-            .then(response => response.json())
-            .then(data => {
-                alert('🧠 ' + data.mensaje);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('❌ Error al analizar con OpenAI');
-            });
-        }
+                 function analizarOpenAI() {
+             fetch('/api/analisis-openai')
+             .then(response => {
+                 if (!response.ok) {
+                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                 }
+                 return response.json();
+             })
+             .then(data => {
+                 if (data && data.mensaje) {
+                     alert('🧠 ' + data.mensaje);
+                 } else if (data && data.resumen) {
+                     alert('🧠 Análisis completado: ' + data.resumen.substring(0, 100) + '...');
+                 } else {
+                     alert('🧠 Análisis completado exitosamente');
+                 }
+             })
+             .catch(error => {
+                 console.error('Error:', error);
+                 alert('❌ Error al analizar con OpenAI: ' + error.message);
+             });
+         }
 
         function limpiarProductos() {
             if (confirm('¿Estás seguro de que quieres limpiar todos los productos?')) {
