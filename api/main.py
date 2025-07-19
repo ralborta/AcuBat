@@ -267,23 +267,35 @@ async def upload_file(file: UploadFile = File(...)):
         
         # Verificar tipo de archivo
         if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) o CSV")
+            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten Excel (.xlsx, .xls) o CSV (.csv)")
+        
+        # Leer contenido del archivo
+        contenido = file.file.read()
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        logger.info(f"Procesando archivo: {file.filename} ({len(contenido)} bytes)")
         
         # Guardar archivo temporalmente
         import tempfile
         import os
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            contenido = file.file.read()
             temp_file.write(contenido)
             temp_file_path = temp_file.name
         
         try:
+            # Verificar si es archivo MOURA
+            es_moura = is_moura_file(temp_file_path)
+            logger.info(f"Archivo detectado como MOURA: {es_moura}")
+            
             # Usar el nuevo sistema de detección y parsing
             productos_data = detect_and_parse_file(temp_file_path)
             
             if not productos_data:
-                raise HTTPException(status_code=400, detail="No se pudieron extraer productos del archivo")
+                raise HTTPException(status_code=400, detail="No se pudieron extraer productos del archivo. Verifica que el archivo contenga datos válidos.")
+            
+            logger.info(f"Productos extraídos: {len(productos_data)}")
             
             # Procesar productos con pricing y rentabilidad
             productos_procesados = pricing_logic.procesar_productos_con_rentabilidad(productos_data)
@@ -296,7 +308,8 @@ async def upload_file(file: UploadFile = File(...)):
                 "mensaje": f"✅ Archivo procesado exitosamente. {len(productos_procesados)} productos cargados.",
                 "productos": len(productos_procesados),
                 "archivo": file.filename,
-                "tipo_detectado": "MOURA" if is_moura_file(temp_file_path) else "Genérico"
+                "tipo_detectado": "MOURA" if es_moura else "Genérico",
+                "tamaño_archivo": len(contenido)
             }
             
         finally:
@@ -307,7 +320,7 @@ async def upload_file(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al procesar archivo: {str(e)}")
+        logger.error(f"Error al procesar archivo {file.filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
 
 @app.post("/cargar-rentabilidades")
