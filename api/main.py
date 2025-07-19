@@ -339,7 +339,7 @@ async def upload_file(file: UploadFile = File(...)):
         logger.error(f"Error al procesar archivo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
 
-@app.post("/upload-rentabilidades")
+@app.post("/cargar-rentabilidades")
 async def upload_rentabilidades(file: UploadFile = File(...)):
     """Endpoint para subir archivo de rentabilidades"""
     try:
