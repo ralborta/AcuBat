@@ -30,7 +30,7 @@ productos_actuales = []
 try:
     from .logic import PricingLogic
     from .openai_helper import OpenAIHelper
-    from .parser import ExcelParser
+    from .parser import ExcelParser, detect_and_parse_file, is_moura_file
     
     pricing_logic = PricingLogic()
     openai_helper = OpenAIHelper()
@@ -280,7 +280,7 @@ async def upload_file(file: UploadFile = File(...)):
         
         try:
             # Usar el nuevo sistema de detección y parsing
-            productos_data = excel_parser.detect_and_parse_file(temp_file_path)
+            productos_data = detect_and_parse_file(temp_file_path)
             
             if not productos_data:
                 raise HTTPException(status_code=400, detail="No se pudieron extraer productos del archivo")
@@ -296,7 +296,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "mensaje": f"✅ Archivo procesado exitosamente. {len(productos_procesados)} productos cargados.",
                 "productos": len(productos_procesados),
                 "archivo": file.filename,
-                "tipo_detectado": "MOURA" if excel_parser.is_moura_file(temp_file_path) else "Genérico"
+                "tipo_detectado": "MOURA" if is_moura_file(temp_file_path) else "Genérico"
             }
             
         finally:
