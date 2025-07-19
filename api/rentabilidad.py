@@ -1,7 +1,8 @@
 import pandas as pd
 import logging
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 from .models import Marca, Canal
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -10,67 +11,47 @@ class RentabilidadValidator:
         self.tabla_rentabilidad = {}
         self.archivo_cargado = False
         
-    def cargar_rentabilidades(self, ruta_archivo: str) -> bool:
-        """Carga el archivo de rentabilidades y estructura los datos"""
+    def cargar_rentabilidades(self, file_path: str) -> bool:
+        """
+        Carga archivo de rentabilidades con soporte para múltiples hojas
+        """
         try:
-            logger.info(f"Cargando archivo de rentabilidades: {ruta_archivo}")
+            logger.info(f"Cargando archivo de rentabilidades: {file_path}")
             
-            # Leer el archivo Excel
-            df = pd.read_excel(ruta_archivo)
-            logger.info(f"Archivo leído: {len(df)} filas, {len(df.columns)} columnas")
-            logger.info(f"Columnas encontradas: {list(df.columns)}")
-            
-            # Normalizar columnas
-            df = self.normalizar_columnas(df)
-            
-            # Procesar datos
-            self.procesar_datos_rentabilidad(df)
-            
-            self.archivo_cargado = True
-            logger.info(f"Rentabilidades cargadas: {len(self.tabla_rentabilidad)} reglas")
-            return True
+            # Usar el nuevo método que maneja múltiples hojas
+            return self.leer_archivo_rentabilidad(file_path)
             
         except Exception as e:
-            logger.error(f"Error cargando rentabilidades: {e}")
+            logger.error(f"Error al cargar rentabilidades: {str(e)}")
             return False
     
-    def normalizar_columnas(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normaliza los nombres de las columnas del archivo de rentabilidades"""
+    def normalizar_columnas(self, columnas) -> list:
+        """
+        Normaliza nombres de columnas para rentabilidad
+        """
         try:
-            # Mapeo de columnas esperadas
-            mapeo_columnas = {}
+            columnas_normalizadas = []
             
-            for col in df.columns:
-                col_lower = str(col).lower().strip()
-                logger.info(f"Procesando columna rentabilidad: '{col}' -> '{col_lower}'")
+            for col in columnas:
+                col_str = str(col).strip().lower()
                 
-                if any(keyword in col_lower for keyword in ['marca', 'brand']):
-                    mapeo_columnas[col] = 'marca'
-                    logger.info(f"  -> Mapeada a 'marca'")
-                elif any(keyword in col_lower for keyword in ['canal', 'channel']):
-                    mapeo_columnas[col] = 'canal'
-                    logger.info(f"  -> Mapeada a 'canal'")
-                elif any(keyword in col_lower for keyword in ['linea', 'line', 'tipo', 'categoria']):
-                    mapeo_columnas[col] = 'linea'
-                    logger.info(f"  -> Mapeada a 'linea'")
-                elif any(keyword in col_lower for keyword in ['margen minimo', 'minimo', 'min', 'minimo margen']):
-                    mapeo_columnas[col] = 'margen_minimo'
-                    logger.info(f"  -> Mapeada a 'margen_minimo'")
-                elif any(keyword in col_lower for keyword in ['margen optimo', 'optimo', 'opt', 'optimo margen']):
-                    mapeo_columnas[col] = 'margen_optimo'
-                    logger.info(f"  -> Mapeada a 'margen_optimo'")
+                # Mapeo de nombres de columnas
+                if any(keyword in col_str for keyword in ['canal', 'channel']):
+                    columnas_normalizadas.append('canal')
+                elif any(keyword in col_str for keyword in ['línea', 'linea', 'line', 'producto', 'product']):
+                    columnas_normalizadas.append('linea')
+                elif any(keyword in col_str for keyword in ['margen mínimo', 'margen_minimo', 'minimo', 'min', 'margen min']):
+                    columnas_normalizadas.append('margen_minimo')
+                elif any(keyword in col_str for keyword in ['margen óptimo', 'margen_optimo', 'optimo', 'opt', 'margen opt']):
+                    columnas_normalizadas.append('margen_optimo')
                 else:
-                    logger.info(f"  -> No mapeada (columna opcional)")
+                    columnas_normalizadas.append(col_str)
             
-            # Renombrar columnas
-            df = df.rename(columns=mapeo_columnas)
-            
-            logger.info(f"Columnas después de normalizar: {list(df.columns)}")
-            return df
+            return columnas_normalizadas
             
         except Exception as e:
             logger.error(f"Error normalizando columnas de rentabilidad: {e}")
-            return df
+            return list(columnas)
     
     def procesar_datos_rentabilidad(self, df: pd.DataFrame):
         """Procesa los datos de rentabilidad y crea la tabla de reglas"""
@@ -195,30 +176,62 @@ class RentabilidadValidator:
             logger.warning(f"Error normalizando marca '{marca_str}': {e}")
             return None
     
-    def normalizar_canal(self, canal_str: str) -> Optional[Canal]:
-        """Normaliza el string de canal a enum Canal"""
-        try:
-            from .models import Canal
-            
-            canal_lower = canal_str.lower().strip()
-            
-            # Mapeo de canales
-            mapeo_canales = {
-                'minorista': Canal.MINORISTA,
-                'mayorista': Canal.MAYORISTA,
-                'distribuidor': Canal.DISTRIBUIDOR,
-                'dist': Canal.DISTRIBUIDOR
-            }
-            
-            for clave, canal_enum in mapeo_canales.items():
-                if clave in canal_lower:
-                    return canal_enum
-            
+    def normalizar_canal(self, canal: str) -> str:
+        """Normaliza el nombre del canal"""
+        if not canal:
+            return "Minorista"
+        
+        canal_lower = canal.lower().strip()
+        
+        if any(keyword in canal_lower for keyword in ['minorista', 'retail', 'tienda']):
+            return "Minorista"
+        elif any(keyword in canal_lower for keyword in ['mayorista', 'wholesale', 'distribuidor']):
+            return "Mayorista"
+        elif any(keyword in canal_lower for keyword in ['distribuidor', 'dealer']):
+            return "Distribuidor"
+        else:
+            return canal.title()
+    
+    def normalizar_linea(self, linea: str) -> str:
+        """Normaliza el nombre de la línea"""
+        if not linea:
+            return "Estándar"
+        
+        linea_lower = linea.lower().strip()
+        
+        if any(keyword in linea_lower for keyword in ['estándar', 'estandar', 'standard']):
+            return "Estándar"
+        elif any(keyword in linea_lower for keyword in ['efb', 'enhanced']):
+            return "EFB"
+        elif any(keyword in linea_lower for keyword in ['agm', 'gel']):
+            return "AGM"
+        elif any(keyword in linea_lower for keyword in ['premium', 'alta']):
+            return "Premium"
+        elif any(keyword in linea_lower for keyword in ['asiática', 'asiatica', 'asian']):
+            return "Asiática"
+        else:
+            return linea.title()
+    
+    def extraer_porcentaje(self, valor) -> Optional[float]:
+        """Extrae porcentaje de un valor"""
+        if pd.isna(valor):
             return None
-            
-        except Exception as e:
-            logger.warning(f"Error normalizando canal '{canal_str}': {e}")
-            return None
+        
+        if isinstance(valor, (int, float)):
+            return float(valor)
+        
+        if isinstance(valor, str):
+            # Limpiar símbolos de porcentaje y espacios
+            cleaned = re.sub(r'[^\d.,]', '', valor)
+            if cleaned:
+                # Convertir coma decimal a punto
+                cleaned = cleaned.replace(',', '.')
+                try:
+                    return float(cleaned)
+                except:
+                    return None
+        
+        return None
     
     def evaluar_rentabilidad(self, producto) -> Dict:
         """Evalúa la rentabilidad de un producto según las reglas cargadas"""
@@ -355,3 +368,127 @@ class RentabilidadValidator:
         except Exception as e:
             logger.error(f"Error obteniendo resumen de rentabilidad: {e}")
             return {'total_reglas': 0, 'por_marca': {}, 'por_canal': {}, 'por_linea': {}} 
+
+    def leer_archivo_rentabilidad(self, file_path: str) -> bool:
+        """
+        Lee archivo de rentabilidades con hojas específicas por marca
+        """
+        try:
+            # Leer todas las hojas del archivo
+            excel_file = pd.ExcelFile(file_path)
+            logger.info(f"Archivo de rentabilidades con {len(excel_file.sheet_names)} hojas: {excel_file.sheet_names}")
+            
+            reglas_cargadas = 0
+            
+            for sheet_name in excel_file.sheet_names:
+                logger.info(f"Procesando hoja de rentabilidad: {sheet_name}")
+                
+                # Leer la hoja
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                
+                # Normalizar nombres de columnas
+                df.columns = self.normalizar_columnas(df.columns)
+                
+                # Determinar marca basada en el nombre de la hoja
+                marca_hoja = self.determinar_marca_desde_hoja(sheet_name)
+                
+                # Procesar reglas de esta hoja
+                reglas_hoja = self.procesar_hoja_rentabilidad(df, marca_hoja)
+                reglas_cargadas += len(reglas_hoja)
+                
+                # Agregar reglas al diccionario principal
+                for regla in reglas_hoja:
+                    clave = (regla['marca'], regla['canal'], regla['linea'])
+                    self.tabla_rentabilidad[clave] = regla
+            
+            logger.info(f"Total de reglas de rentabilidad cargadas: {reglas_cargadas}")
+            self.archivo_cargado = reglas_cargadas > 0
+            self.archivo_origen = file_path
+            
+            return self.archivo_cargado
+            
+        except Exception as e:
+            logger.error(f"Error al leer archivo de rentabilidad: {str(e)}")
+            return False
+    
+    def determinar_marca_desde_hoja(self, sheet_name: str) -> str:
+        """
+        Determina la marca basada en el nombre de la hoja
+        """
+        sheet_lower = sheet_name.lower().strip()
+        
+        # Mapeo de nombres de hoja a marcas
+        mapeo_marcas = {
+            'moura': 'Moura',
+            'acubat': 'Acubat', 
+            'lubeck': 'Lubeck',
+            'solar': 'Solar',
+            'zetta': 'Zetta',
+            'rentabilidades': 'General',  # Hoja general
+            'general': 'General'
+        }
+        
+        # Buscar coincidencias
+        for key, marca in mapeo_marcas.items():
+            if key in sheet_lower:
+                logger.info(f"Hoja '{sheet_name}' mapeada a marca: {marca}")
+                return marca
+        
+        # Si no encuentra coincidencia, usar el nombre de la hoja
+        logger.info(f"Hoja '{sheet_name}' sin mapeo específico, usando como marca")
+        return sheet_name.title()
+    
+    def procesar_hoja_rentabilidad(self, df: pd.DataFrame, marca_hoja: str) -> List[Dict]:
+        """
+        Procesa una hoja específica de rentabilidad
+        """
+        reglas = []
+        
+        # Buscar columnas requeridas
+        columnas_requeridas = ['canal', 'linea', 'margen_minimo', 'margen_optimo']
+        columnas_disponibles = [col for col in columnas_requeridas if col in df.columns]
+        
+        if len(columnas_disponibles) < 3:  # Al menos canal, línea y un margen
+            logger.warning(f"Hoja {marca_hoja}: Columnas insuficientes. Disponibles: {list(df.columns)}")
+            return reglas
+        
+        # Procesar cada fila
+        for idx, row in df.iterrows():
+            try:
+                # Extraer datos básicos
+                canal = self.normalizar_canal(str(row.get('canal', '')).strip())
+                linea = self.normalizar_linea(str(row.get('linea', '')).strip())
+                margen_minimo = self.extraer_porcentaje(row.get('margen_minimo'))
+                margen_optimo = self.extraer_porcentaje(row.get('margen_optimo'))
+                
+                # Validar datos mínimos
+                if not canal or not linea:
+                    continue
+                
+                if margen_minimo is None and margen_optimo is None:
+                    continue
+                
+                # Usar valores por defecto si no están disponibles
+                if margen_minimo is None:
+                    margen_minimo = margen_optimo * 0.7 if margen_optimo else 20
+                if margen_optimo is None:
+                    margen_optimo = margen_minimo * 1.4 if margen_minimo else 30
+                
+                regla = {
+                    'marca': marca_hoja,
+                    'canal': canal,
+                    'linea': linea,
+                    'margen_minimo': margen_minimo,
+                    'margen_optimo': margen_optimo,
+                    'hoja_origen': marca_hoja
+                }
+                
+                reglas.append(regla)
+                logger.debug(f"Regla cargada: {marca_hoja} - {canal} - {linea} - Min: {margen_minimo}% - Opt: {margen_optimo}%")
+                
+            except Exception as e:
+                logger.warning(f"Error procesando fila {idx} en hoja {marca_hoja}: {str(e)}")
+                continue
+        
+        logger.info(f"Hoja {marca_hoja}: {len(reglas)} reglas procesadas")
+        return reglas 
