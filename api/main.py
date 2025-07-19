@@ -98,6 +98,11 @@ async def upload_file(file: UploadFile = File(...)):
                 "nombre": f"Producto {i}",
                 "precio": 100 + i * 10,
                 "marca": "LÜSQTOFF" if i % 3 == 0 else "BLACK SERIES",
+                "canal": "minorista" if i % 2 == 0 else "mayorista",
+                "capacidad": f"{50 + i} Ah",
+                "precio_base": 100 + i * 10,
+                "precio_final": 150 + i * 15,
+                "margen": 25.0 + (i % 10),
                 "alertas": ["margen_bajo"] if i % 7 == 0 else []
             }
             for i in range(1, productos_procesados + 1)
