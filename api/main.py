@@ -23,22 +23,53 @@ productos_actuales = []
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Página principal con panel de productos"""
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "productos": productos_actuales,
-        "total_productos": len(productos_actuales),
-        "productos_con_alertas": 0,
-        "openai_disponible": False
-    })
+    try:
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "productos": productos_actuales if productos_actuales else [],
+            "total_productos": len(productos_actuales) if productos_actuales else 0,
+            "productos_con_alertas": len([p for p in productos_actuales if p.get('alertas')]) if productos_actuales else 0,
+            "openai_disponible": False
+        })
+    except Exception as e:
+        logger.error(f"Error en página principal: {e}")
+        # Retornar una página simple en caso de error
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Acubat - Error</title></head>
+        <body>
+            <h1>Backend Acubat</h1>
+            <p>Error cargando la página: {str(e)}</p>
+            <p>Productos cargados: {len(productos_actuales) if productos_actuales else 0}</p>
+            <a href="/health">Health Check</a>
+        </body>
+        </html>
+        """)
 
 @app.get("/alertas", response_class=HTMLResponse)
 async def alertas(request: Request):
     """Página de alertas"""
-    return templates.TemplateResponse("alertas.html", {
-        "request": request,
-        "productos": [],
-        "total_alertas": 0
-    })
+    try:
+        productos_con_alertas = [p for p in productos_actuales if p.get('alertas')] if productos_actuales else []
+        return templates.TemplateResponse("alertas.html", {
+            "request": request,
+            "productos": productos_con_alertas,
+            "total_alertas": len(productos_con_alertas)
+        })
+    except Exception as e:
+        logger.error(f"Error en página de alertas: {e}")
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Acubat - Alertas</title></head>
+        <body>
+            <h1>Alertas</h1>
+            <p>Error cargando alertas: {str(e)}</p>
+            <a href="/">Volver al inicio</a>
+        </body>
+        </html>
+        """)
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
