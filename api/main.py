@@ -70,66 +70,55 @@ async def upload_file(file: UploadFile = File(...)):
         
         # En Vercel, usar memoria en lugar de archivos temporales
         import io
+        import pandas as pd
         
+        # Leer el archivo directamente desde memoria
+        contenido = file.file.read()
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        # Crear un buffer en memoria
+        buffer = io.BytesIO(contenido)
+        
+        # Intentar leer con diferentes engines
+        df = None
         try:
-            # Leer el archivo directamente desde memoria
-            contenido = file.file.read()
-            
-            if not contenido:
-                raise HTTPException(status_code=400, detail="El archivo está vacío")
-            
-            # Crear un buffer en memoria
-            buffer = io.BytesIO(contenido)
-            
-            # Procesar archivo desde memoria
-            import pandas as pd
-            
-            # Intentar leer con diferentes engines
-            df = None
+            df = pd.read_excel(buffer, engine='openpyxl')
+        except Exception as e1:
             try:
-                df = pd.read_excel(buffer, engine='openpyxl')
-            except:
-                try:
-                    buffer.seek(0)  # Reset buffer
-                    df = pd.read_excel(buffer, engine='xlrd')
-                except:
-                    raise HTTPException(status_code=400, detail="No se pudo leer el archivo Excel. Asegúrate de que sea un archivo .xlsx o .xls válido.")
-            
-            # Verificar que el DataFrame no esté vacío
-            if df is None or df.empty:
-                raise HTTPException(status_code=400, detail="El archivo Excel está vacío")
-            
-            # Verificar que tenga columnas
-            if len(df.columns) == 0:
-                raise HTTPException(status_code=400, detail="El archivo Excel no tiene columnas válidas")
-            
-            logger.info(f"Archivo leído exitosamente: {len(df)} filas, {len(df.columns)} columnas")
-            
-            # Convertir DataFrame a productos usando el parser
-            productos = parser.convertir_dataframe_a_productos(df)
-            
-            if not productos:
-                raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo. Verifica que tenga las columnas correctas (código, nombre, precio, etc.)")
-            
-            logger.info(f"Productos procesados: {len(productos)}")
-            
-            productos_procesados = logica.procesar_productos(productos)
-            
-            # Actualizar productos globales
-            global productos_actuales
-            productos_actuales = productos_procesados
-            
-            logger.info(f"Productos actualizados en memoria: {len(productos_actuales)}")
-            
-        except HTTPException:
-            raise  # Re-raise HTTP exceptions
-        except pd.errors.EmptyDataError:
-            raise HTTPException(status_code=400, detail="El archivo Excel está vacío o no tiene datos válidos")
-        except pd.errors.ParserError:
-            raise HTTPException(status_code=400, detail="El archivo no es un Excel válido. Asegúrate de que sea un archivo .xlsx o .xls")
-        except Exception as e:
-            logger.error(f"Error procesando archivo: {str(e)}")
-            raise HTTPException(status_code=400, detail=f"Error al procesar archivo: {str(e)}")
+                buffer.seek(0)  # Reset buffer
+                df = pd.read_excel(buffer, engine='xlrd')
+            except Exception as e2:
+                logger.error(f"Error leyendo Excel: openpyxl={e1}, xlrd={e2}")
+                raise HTTPException(status_code=400, detail="No se pudo leer el archivo Excel. Asegúrate de que sea un archivo .xlsx o .xls válido.")
+        
+        # Verificar que el DataFrame no esté vacío
+        if df is None or df.empty:
+            raise HTTPException(status_code=400, detail="El archivo Excel está vacío")
+        
+        # Verificar que tenga columnas
+        if len(df.columns) == 0:
+            raise HTTPException(status_code=400, detail="El archivo Excel no tiene columnas válidas")
+        
+        logger.info(f"Archivo leído exitosamente: {len(df)} filas, {len(df.columns)} columnas")
+        logger.info(f"Columnas encontradas: {list(df.columns)}")
+        
+        # Convertir DataFrame a productos usando el parser
+        productos = parser.convertir_dataframe_a_productos(df)
+        
+        if not productos:
+            raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo. Verifica que tenga las columnas correctas (código, nombre, precio, etc.)")
+        
+        logger.info(f"Productos procesados: {len(productos)}")
+        
+        productos_procesados = logica.procesar_productos(productos)
+        
+        # Actualizar productos globales
+        global productos_actuales
+        productos_actuales = productos_procesados
+        
+        logger.info(f"Productos actualizados en memoria: {len(productos_actuales)}")
         
         return {
             "mensaje": "Archivo procesado exitosamente",
@@ -137,8 +126,14 @@ async def upload_file(file: UploadFile = File(...)):
             "productos_con_alertas": len([p for p in productos_procesados if p.alertas])
         }
         
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except pd.errors.EmptyDataError:
+        raise HTTPException(status_code=400, detail="El archivo Excel está vacío o no tiene datos válidos")
+    except pd.errors.ParserError:
+        raise HTTPException(status_code=400, detail="El archivo no es un Excel válido. Asegúrate de que sea un archivo .xlsx o .xls")
     except Exception as e:
-        logger.error(f"Error al procesar archivo: {e}")
+        logger.error(f"Error al procesar archivo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
 
 @app.get("/api/productos")
