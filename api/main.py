@@ -317,13 +317,8 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
         logger.info(f"Archivo recibido: {file.filename}")
         logger.info(f"Content-Type: {file.content_type}")
         
-        if not MODULES_AVAILABLE:
-            logger.error("Módulos no disponibles")
-            raise HTTPException(status_code=503, detail="Sistema en modo básico. Módulos de procesamiento no disponibles.")
-        
         # Verificar que sea un archivo Excel
         if not file.filename.endswith(('.xlsx', '.xls')):
-            logger.error(f"Tipo de archivo no soportado: {file.filename}")
             raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten archivos Excel (.xlsx, .xls) para rentabilidades")
         
         # Leer el archivo
@@ -331,10 +326,7 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
         logger.info(f"Contenido leído: {len(contenido)} bytes")
         
         if not contenido:
-            logger.error("Archivo vacío")
             raise HTTPException(status_code=400, detail="El archivo está vacío")
-        
-        logger.info(f"Procesando archivo de rentabilidades: {file.filename} ({len(contenido)} bytes)")
         
         # Guardar archivo temporalmente
         import tempfile
@@ -346,28 +338,47 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
         logger.info(f"Archivo temporal creado: {temp_file_path}")
         
         try:
-            # Cargar rentabilidades
-            logger.info("Iniciando carga de rentabilidades...")
-            rentabilidad_cargada = pricing_logic.cargar_rentabilidades(temp_file_path)
+            # Leer el archivo Excel para diagnosticar
+            import pandas as pd
             
-            if not rentabilidad_cargada:
-                logger.error("No se pudo cargar el archivo de rentabilidades")
-                raise HTTPException(status_code=400, detail="No se pudo cargar el archivo de rentabilidades. Verifica que el archivo contenga hojas con columnas: Canal, Línea, Margen Mínimo, Margen Óptimo")
+            # Leer todas las hojas
+            excel_file = pd.ExcelFile(temp_file_path)
+            logger.info(f"Archivo Excel con {len(excel_file.sheet_names)} hojas: {excel_file.sheet_names}")
             
-            # Obtener resumen de rentabilidades
-            logger.info("Obteniendo resumen de rentabilidades...")
-            resumen_rentabilidad = pricing_logic.rentabilidad_validator.obtener_resumen_rentabilidad()
+            # Analizar cada hoja
+            for sheet_name in excel_file.sheet_names:
+                logger.info(f"=== ANALIZANDO HOJA: {sheet_name} ===")
+                
+                # Leer la hoja
+                df = pd.read_excel(temp_file_path, sheet_name=sheet_name)
+                logger.info(f"Columnas en hoja '{sheet_name}': {list(df.columns)}")
+                logger.info(f"Primeras 3 filas de '{sheet_name}':")
+                logger.info(df.head(3).to_string())
+                
+                # Verificar si tiene las columnas requeridas
+                columnas_requeridas = ['canal', 'línea', 'margen mínimo', 'margen óptimo']
+                columnas_encontradas = []
+                
+                for col in df.columns:
+                    col_lower = str(col).lower().strip()
+                    if any(req in col_lower for req in ['canal', 'channel']):
+                        columnas_encontradas.append('canal')
+                    elif any(req in col_lower for req in ['línea', 'linea', 'line']):
+                        columnas_encontradas.append('línea')
+                    elif any(req in col_lower for req in ['margen mínimo', 'margen_minimo', 'minimo']):
+                        columnas_encontradas.append('margen mínimo')
+                    elif any(req in col_lower for req in ['margen óptimo', 'margen_optimo', 'optimo']):
+                        columnas_encontradas.append('margen óptimo')
+                
+                logger.info(f"Columnas requeridas encontradas en '{sheet_name}': {columnas_encontradas}")
             
-            logger.info(f"Rentabilidades cargadas exitosamente: {resumen_rentabilidad.get('total_reglas', 0)} reglas")
-            logger.info(f"=== CARGAR RENTABILIDADES EXITOSO ===")
-            
+            # Por ahora, solo devolver información de diagnóstico
             return {
-                "mensaje": f"Archivo de rentabilidades cargado exitosamente. {resumen_rentabilidad.get('total_reglas', 0)} reglas procesadas.",
-                "reglas_cargadas": resumen_rentabilidad.get('total_reglas', 0),
-                "resumen_rentabilidad": resumen_rentabilidad,
+                "mensaje": f"Archivo analizado: {file.filename} con {len(excel_file.sheet_names)} hojas",
+                "hojas": excel_file.sheet_names,
                 "archivo_original": file.filename,
                 "tamaño_archivo": len(contenido),
-                "status": "success"
+                "status": "diagnostico"
             }
             
         finally:
@@ -376,9 +387,6 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
                 os.unlink(temp_file_path)
                 logger.info(f"Archivo temporal eliminado: {temp_file_path}")
         
-    except HTTPException:
-        logger.error("HTTPException en cargar-rentabilidades")
-        raise
     except Exception as e:
         logger.error(f"Error inesperado en cargar-rentabilidades: {str(e)}")
         logger.error(f"Tipo de error: {type(e).__name__}")
