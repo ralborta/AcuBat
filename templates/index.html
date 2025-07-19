@@ -248,11 +248,11 @@
                     <div class="card-body">
                         <div class="upload-area" id="uploadArea">
                             <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                            <h5>Arrastra tu archivo Excel aquí</h5>
-                            <p class="text-muted">o haz clic para seleccionar</p>
-                            <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                            <h5>Arrastra tu archivo aquí</h5>
+                            <p class="text-muted">Soporta Excel (.xlsx, .xls), CSV (.csv) y PDF (.pdf)</p>
+                            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf" style="display: none;">
                             <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                                <i class="fas fa-file-excel me-1"></i>
+                                <i class="fas fa-file-upload me-1"></i>
                                 Seleccionar Archivo
                             </button>
                         </div>
@@ -492,7 +492,8 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert(`Archivo procesado exitosamente!\nProductos: ${result.productos_procesados}\nCon alertas: ${result.productos_con_alertas}`);
+                    const mensaje = `✅ ${result.mensaje}\n\n📊 Productos procesados: ${result.productos_procesados}\n⚠️ Con alertas: ${result.productos_con_alertas}\n📄 Archivo: ${result.archivo_original}\n🔄 Procesamiento: ${result.tipo_procesamiento}`;
+                    alert(mensaje);
                     location.reload();
                 } else {
                     alert('Error: ' + result.detail);

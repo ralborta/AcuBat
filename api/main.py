@@ -90,9 +90,9 @@ async def alertas(request: Request):
 async def upload_file(file: UploadFile = File(...)):
     """Endpoint para subir archivo Excel y procesar con pricing"""
     try:
-        # Verificar que sea un archivo Excel
-        if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) o CSV (.csv)")
+        # Verificar que sea un archivo soportado
+        if not file.filename.endswith(('.xlsx', '.xls', '.csv', '.pdf')):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls), CSV (.csv) o PDF (.pdf)")
         
         # Leer el archivo
         contenido = file.file.read()
@@ -109,8 +109,30 @@ async def upload_file(file: UploadFile = File(...)):
             temp_file_path = temp_file.name
         
         try:
-            # Procesar archivo con el parser
-            productos = excel_parser.leer_excel(temp_file_path)
+            # Verificar si es un PDF y convertirlo
+            if file.filename.endswith('.pdf'):
+                logger.info(f"Detectado archivo PDF: {file.filename}")
+                
+                # Importar convertidor PDF
+                from pdf_converter import PDFConverter
+                pdf_converter = PDFConverter()
+                
+                # Convertir PDF a Excel
+                excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)
+                
+                if excel_path:
+                    logger.info(f"PDF convertido exitosamente a: {excel_path}")
+                    # Usar el archivo Excel convertido
+                    productos = excel_parser.leer_excel(excel_path)
+                    
+                    # Limpiar archivo temporal Excel
+                    if os.path.exists(excel_path):
+                        os.unlink(excel_path)
+                else:
+                    raise HTTPException(status_code=400, detail="No se pudo convertir el PDF. Verifica que contenga tablas o texto estructurado.")
+            else:
+                # Procesar archivo Excel/CSV directamente
+                productos = excel_parser.leer_excel(temp_file_path)
             
             if not productos:
                 raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
@@ -133,13 +155,18 @@ async def upload_file(file: UploadFile = File(...)):
             
             productos_con_alertas = len([p for p in productos_procesados if p.alertas])
             
+            # Determinar tipo de archivo procesado
+            archivo_tipo = "PDF convertido" if file.filename.endswith('.pdf') else "Excel/CSV"
+            
             return {
-                "mensaje": "Archivo procesado exitosamente con pricing",
+                "mensaje": f"Archivo {archivo_tipo} procesado exitosamente con pricing",
                 "productos_procesados": len(productos_procesados),
                 "productos_con_alertas": productos_con_alertas,
                 "resumen_marcas": resumen_marcas,
                 "resumen_canales": resumen_canales,
-                "openai_utilizado": openai_helper.esta_disponible()
+                "openai_utilizado": openai_helper.esta_disponible(),
+                "archivo_original": file.filename,
+                "tipo_procesamiento": archivo_tipo
             }
             
         finally:
@@ -249,6 +276,70 @@ async def filtrar_productos(
             }
         }
         
+            except Exception as e:
+            logger.error(f"Error filtrando productos: {e}")
+            raise HTTPException(status_code=500, detail=f"Error filtrando productos: {str(e)}")
+
+@app.post("/convertir-pdf")
+async def convertir_pdf(file: UploadFile = File(...)):
+    """Endpoint específico para convertir PDFs a Excel"""
+    try:
+        # Verificar que sea un archivo PDF
+        if not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF (.pdf)")
+        
+        # Leer el archivo
+        contenido = file.file.read()
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        # Guardar archivo temporalmente
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Importar convertidor PDF
+            from pdf_converter import PDFConverter
+            pdf_converter = PDFConverter()
+            
+            # Convertir PDF a Excel
+            excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)
+            
+            if excel_path:
+                # Leer el archivo Excel convertido
+                import pandas as pd
+                df = pd.read_excel(excel_path)
+                
+                # Preparar respuesta
+                response_data = {
+                    "mensaje": "PDF convertido exitosamente",
+                    "archivo_original": file.filename,
+                    "archivo_convertido": os.path.basename(excel_path),
+                    "filas_procesadas": len(df),
+                    "columnas": list(df.columns),
+                    "preview": df.head(5).to_dict('records')
+                }
+                
+                # Limpiar archivo temporal Excel
+                if os.path.exists(excel_path):
+                    os.unlink(excel_path)
+                
+                return response_data
+            else:
+                raise HTTPException(status_code=400, detail="No se pudo convertir el PDF. Verifica que contenga tablas o texto estructurado.")
+                
+        finally:
+            # Limpiar archivo temporal PDF
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error filtrando productos: {e}")
-        raise HTTPException(status_code=500, detail=f"Error filtrando productos: {str(e)}") 
+        logger.error(f"Error al convertir PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al convertir PDF: {str(e)}") 
