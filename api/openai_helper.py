@@ -31,7 +31,7 @@ class OpenAIHelper:
             # Preparar prompt para análisis
             prompt = self._crear_prompt_analisis(producto)
             
-            # Llamar a OpenAI
+            # Llamar a OpenAI con timeout y manejo de errores
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -44,8 +44,9 @@ class OpenAIHelper:
                         "content": prompt
                     }
                 ],
-                max_tokens=200,
-                temperature=0.3
+                max_tokens=150,
+                temperature=0.3,
+                timeout=30  # Timeout de 30 segundos
             )
             
             sugerencia = response.choices[0].message.content.strip()
@@ -53,6 +54,12 @@ class OpenAIHelper:
             
             return sugerencia
             
+        except openai.RateLimitError:
+            logger.warning("Rate limit de OpenAI alcanzado")
+            return "Análisis temporalmente no disponible (rate limit)"
+        except openai.APIError as e:
+            logger.error(f"Error de API OpenAI: {e}")
+            return "Error de conexión con OpenAI"
         except Exception as e:
             logger.error(f"Error en análisis OpenAI para {producto.codigo}: {e}")
             return None
@@ -64,22 +71,28 @@ class OpenAIHelper:
             return productos
         
         productos_analizados = []
+        productos_analizados_count = 0
         
-        for producto in productos:
+        for i, producto in enumerate(productos):
             try:
-                # Solo analizar productos con alertas o márgenes extremos
-                if producto.alertas or producto.margen < 10 or producto.margen > 80:
+                # Solo analizar productos con alertas o márgenes extremos (máximo 10 productos)
+                if (producto.alertas or producto.margen < 10 or producto.margen > 80) and productos_analizados_count < 10:
+                    logger.info(f"Analizando producto {i+1}/{len(productos)}: {producto.codigo}")
                     sugerencia = self.analizar_producto(producto)
                     if sugerencia:
-                        producto.sugerencias_ai = sugerencia
+                        producto.sugerencias_openai = sugerencia
+                        productos_analizados_count += 1
+                else:
+                    producto.sugerencias_openai = ""
                 
                 productos_analizados.append(producto)
                 
             except Exception as e:
                 logger.error(f"Error analizando producto {producto.codigo}: {e}")
+                producto.sugerencias_openai = "Error en análisis"
                 productos_analizados.append(producto)
         
-        logger.info(f"Analizados {len(productos_analizados)} productos con OpenAI")
+        logger.info(f"Analizados {productos_analizados_count} productos con OpenAI de {len(productos)} total")
         return productos_analizados
 
     def _crear_prompt_analisis(self, producto: Producto) -> str:
@@ -87,7 +100,7 @@ class OpenAIHelper:
         alertas_texto = ", ".join(producto.alertas) if producto.alertas else "Sin alertas"
         
         prompt = f"""
-Analiza este producto y proporciona una sugerencia concisa:
+Analiza este producto de baterías y proporciona una sugerencia concisa:
 
 **Producto:**
 - Código: {producto.codigo}
@@ -99,12 +112,10 @@ Analiza este producto y proporciona una sugerencia concisa:
 - Margen: {producto.margen:.1f}%
 - Alertas: {alertas_texto}
 
-**Preguntas:**
-1. ¿Este precio parece correcto para el canal y la marca?
-2. ¿Hay indicios de que el markup aplicado es excesivo o insuficiente?
-3. ¿Qué sugerencia darías para optimizar el precio?
+**Pregunta:**
+¿Este precio parece correcto para el canal y la marca? ¿Qué sugerencia darías?
 
-Responde de forma concisa (máximo 2-3 líneas) y práctica.
+Responde de forma concisa (máximo 2 líneas) y práctica.
 """
         return prompt
 
@@ -143,7 +154,7 @@ Responde de forma concisa (máximo 2-3 líneas) y práctica.
                     resumen_marcas[marca]['margen_promedio'] = round(resumen_marcas[marca]['margen_promedio'] / total, 1)
             
             prompt = f"""
-Genera un resumen ejecutivo del análisis de precios:
+Genera un resumen ejecutivo del análisis de precios de baterías:
 
 **Estadísticas generales:**
 - Total productos: {total_productos}
@@ -157,7 +168,7 @@ Genera un resumen ejecutivo del análisis de precios:
 {chr(10).join([f"- {marca}: {data['total']} productos, {data['con_alertas']} alertas, margen {data['margen_promedio']}%" for marca, data in resumen_marcas.items()])}
 
 **Recomendaciones principales:**
-Proporciona 2-3 recomendaciones clave para optimizar la estrategia de precios.
+Proporciona 2-3 recomendaciones clave para optimizar la estrategia de precios de baterías.
 
 Responde de forma ejecutiva y práctica.
 """
@@ -167,19 +178,25 @@ Responde de forma ejecutiva y práctica.
                 messages=[
                     {
                         "role": "system",
-                        "content": "Eres un consultor experto en estrategia de precios. Proporciona análisis ejecutivos y recomendaciones prácticas."
+                        "content": "Eres un consultor experto en estrategia de precios de baterías. Proporciona análisis ejecutivos y recomendaciones prácticas."
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                max_tokens=300,
-                temperature=0.3
+                max_tokens=250,
+                temperature=0.3,
+                timeout=30
             )
             
             return response.choices[0].message.content.strip()
             
+        except openai.RateLimitError:
+            return "Análisis temporalmente no disponible (rate limit)"
+        except openai.APIError as e:
+            logger.error(f"Error de API OpenAI: {e}")
+            return "Error de conexión con OpenAI"
         except Exception as e:
             logger.error(f"Error generando resumen de análisis: {e}")
             return f"Error generando resumen: {str(e)}"
