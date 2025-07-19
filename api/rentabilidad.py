@@ -95,24 +95,24 @@ class RentabilidadValidator:
                     margen_minimo = self.convertir_porcentaje(row.get('margen_minimo', 0))
                     margen_optimo = self.convertir_porcentaje(row.get('margen_optimo', 0))
                     
-                    # Normalizar marca y canal
-                    marca = self.normalizar_marca(marca_str)
-                    canal = self.normalizar_canal(canal_str)
+                    # Normalizar marca y canal usando strings
+                    marca_norm = self.normalizar_marca_string(marca_str)
+                    canal_norm = self.normalizar_canal(canal_str)
                     
-                    if marca and canal and linea_str:
-                        # Crear clave única
-                        clave = (marca.value, canal.value, linea_str.lower())
+                    if marca_norm and canal_norm and linea_str:
+                        # Crear clave única usando strings
+                        clave = (marca_norm, canal_norm, linea_str.lower())
                         
-                        # Guardar regla
+                        # Guardar regla usando strings
                         self.tabla_rentabilidad[clave] = {
-                            'marca': marca,
-                            'canal': canal,
+                            'marca': marca_norm,
+                            'canal': canal_norm,
                             'linea': linea_str,
                             'margen_minimo': margen_minimo,
                             'margen_optimo': margen_optimo
                         }
                         
-                        logger.info(f"Regla agregada: {marca.value} - {canal.value} - {linea_str} (min: {margen_minimo}%, opt: {margen_optimo}%)")
+                        logger.info(f"Regla agregada: {marca_norm} - {canal_norm} - {linea_str} (min: {margen_minimo}%, opt: {margen_optimo}%)")
                     
                 except Exception as e:
                     logger.warning(f"Error procesando fila {index} de rentabilidades: {e}")
@@ -150,31 +150,32 @@ class RentabilidadValidator:
             logger.warning(f"Error convirtiendo porcentaje '{valor}': {e}")
             return 0.0
     
-    def normalizar_marca(self, marca_str: str) -> Optional[Marca]:
-        """Normaliza el string de marca a enum Marca"""
+    def normalizar_marca_string(self, marca_str: str) -> str:
+        """Normaliza el string de marca a string normalizado"""
         try:
             marca_lower = marca_str.lower().strip()
             
-            # Mapeo de marcas
+            # Mapeo de marcas a strings
             mapeo_marcas = {
-                'moura': Marca.MOURA,
-                'acubat': Marca.ACUBAT,
-                'lubeck': Marca.LUBECK,
-                'solar': Marca.SOLAR,
-                'zetta': Marca.SOLAR,  # Zetta como marca solar
-                'zx': Marca.SOLAR,
-                'lb': Marca.LUBECK
+                'moura': 'Moura',
+                'acubat': 'Acubat',
+                'lubeck': 'Lubeck',
+                'solar': 'Solar',
+                'zetta': 'Zetta',
+                'zx': 'Zetta',
+                'lb': 'Lubeck'
             }
             
-            for clave, marca_enum in mapeo_marcas.items():
+            for clave, marca_norm in mapeo_marcas.items():
                 if clave in marca_lower:
-                    return marca_enum
+                    return marca_norm
             
-            return None
+            # Si no encuentra coincidencia, usar el original
+            return marca_str.title() if marca_str else "General"
             
         except Exception as e:
             logger.warning(f"Error normalizando marca '{marca_str}': {e}")
-            return None
+            return "General"
     
     def normalizar_canal(self, canal: str) -> str:
         """Normaliza el nombre del canal"""
@@ -420,9 +421,15 @@ class RentabilidadValidator:
         """
         reglas = []
         
+        logger.info(f"=== PROCESANDO HOJA: {marca_hoja} ===")
+        logger.info(f"Columnas originales: {list(df.columns)}")
+        
         # Buscar columnas requeridas
         columnas_requeridas = ['canal', 'linea', 'margen_minimo', 'margen_optimo']
         columnas_disponibles = [col for col in columnas_requeridas if col in df.columns]
+        
+        logger.info(f"Columnas requeridas encontradas: {columnas_disponibles}")
+        logger.info(f"Columnas faltantes: {[col for col in columnas_requeridas if col not in df.columns]}")
         
         if len(columnas_disponibles) < 3:  # Al menos canal, línea y un margen
             logger.warning(f"Hoja {marca_hoja}: Columnas insuficientes. Disponibles: {list(df.columns)}")
@@ -432,16 +439,24 @@ class RentabilidadValidator:
         for idx, row in df.iterrows():
             try:
                 # Extraer datos básicos
-                canal = self.normalizar_canal(str(row.get('canal', '')).strip())
-                linea = self.normalizar_linea(str(row.get('linea', '')).strip())
+                canal_raw = str(row.get('canal', '')).strip()
+                linea_raw = str(row.get('linea', '')).strip()
                 margen_minimo = self.extraer_porcentaje(row.get('margen_minimo'))
                 margen_optimo = self.extraer_porcentaje(row.get('margen_optimo'))
                 
+                logger.debug(f"Fila {idx}: canal='{canal_raw}', linea='{linea_raw}', min={margen_minimo}, opt={margen_optimo}")
+                
+                # Normalizar canal y línea
+                canal = self.normalizar_canal(canal_raw)
+                linea = self.normalizar_linea(linea_raw)
+                
                 # Validar datos mínimos
                 if not canal or not linea:
+                    logger.warning(f"Fila {idx}: Datos insuficientes - canal: '{canal_raw}' -> '{canal}', linea: '{linea_raw}' -> '{linea}'")
                     continue
                 
                 if margen_minimo is None and margen_optimo is None:
+                    logger.warning(f"Fila {idx}: Sin márgenes válidos")
                     continue
                 
                 # Usar valores por defecto si no están disponibles
@@ -466,5 +481,5 @@ class RentabilidadValidator:
                 logger.warning(f"Error procesando fila {idx} en hoja {marca_hoja}: {str(e)}")
                 continue
         
-        logger.info(f"Hoja {marca_hoja}: {len(reglas)} reglas procesadas")
+        logger.info(f"Hoja {marca_hoja}: {len(reglas)} reglas procesadas exitosamente")
         return reglas 
