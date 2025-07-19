@@ -107,8 +107,13 @@ async def upload_file(file: UploadFile = File(...)):
         # Convertir DataFrame a productos usando el parser
         productos = parser.convertir_dataframe_a_productos(df)
         
-        if not productos:
-            raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo. Verifica que tenga las columnas correctas (código, nombre, precio, etc.)")
+                    if not productos:
+                # Obtener información sobre las columnas encontradas
+                columnas_encontradas = list(df.columns)
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"No se pudieron procesar productos del archivo. Columnas encontradas: {columnas_encontradas}. Se requieren: MODELO, DESCRIPCION, PRECIO LISTA, PVP On line"
+                )
         
         logger.info(f"Productos procesados: {len(productos)}")
         

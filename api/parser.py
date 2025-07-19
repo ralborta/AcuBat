@@ -152,6 +152,19 @@ class ExcelParser:
             logger.info(f"DataFrame después de limpiar headers: {len(df)} filas, {len(df.columns)} columnas")
             logger.info(f"Columnas finales: {list(df.columns)}")
             
+            # Verificar que tengamos las columnas mínimas requeridas
+            columnas_requeridas = ['modelo', 'descripcion', 'precio lista', 'pvp on line']
+            columnas_faltantes = []
+            
+            for col_req in columnas_requeridas:
+                if col_req not in [str(col).lower().strip() for col in df.columns]:
+                    columnas_faltantes.append(col_req)
+            
+            if columnas_faltantes:
+                logger.error(f"Columnas requeridas faltantes: {columnas_faltantes}")
+                logger.error(f"Columnas disponibles: {[str(col).lower().strip() for col in df.columns]}")
+                return []  # Retornar lista vacía si faltan columnas requeridas
+            
             # Normalizar columnas
             df_normalizado = self.normalizar_columnas(df)
             logger.info(f"Columnas después de normalizar: {list(df_normalizado.columns)}")
@@ -176,6 +189,23 @@ class ExcelParser:
             productos = self.convertir_a_productos(df)
             
             logger.info(f"Convertidos {len(productos)} productos del DataFrame")
+            
+            # Si no se procesaron productos, dar información detallada
+            if len(productos) == 0:
+                logger.error(f"No se procesaron productos. Columnas disponibles: {list(df.columns)}")
+                logger.error(f"Columnas normalizadas: {list(df.columns)}")
+                
+                # Verificar qué columnas se mapearon
+                columnas_requeridas = ['codigo', 'nombre', 'precio_base', 'precio_final']
+                columnas_faltantes = []
+                
+                for col_req in columnas_requeridas:
+                    if col_req not in df.columns:
+                        columnas_faltantes.append(col_req)
+                
+                if columnas_faltantes:
+                    logger.error(f"Columnas faltantes: {columnas_faltantes}")
+            
             return productos
             
         except Exception as e:
