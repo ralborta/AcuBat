@@ -78,25 +78,35 @@ class ExcelParser:
         
         # También buscar coincidencias parciales
         for col in df.columns:
-            col_lower = col.lower()
+            col_lower = str(col).lower().strip()
+            logger.info(f"Procesando columna: '{col}' -> '{col_lower}'")
+            
             if 'codigo' in col_lower or 'code' in col_lower or 'id' in col_lower or 'modelo' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'codigo'
-            elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower:
+                    logger.info(f"  -> Mapeada a 'codigo'")
+            elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower or 'descripcion' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'nombre'
-            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower or 'pvp' in col_lower:
+                    logger.info(f"  -> Mapeada a 'nombre'")
+            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower or 'pvp' in col_lower or 'lista' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'precio_base'
+                    logger.info(f"  -> Mapeada a 'precio_base'")
             elif 'marca' in col_lower or 'brand' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'marca'
-            elif 'categoria' in col_lower or 'category' in col_lower or 'tipo' in col_lower or 'rubro' in col_lower:
+                    logger.info(f"  -> Mapeada a 'marca'")
+            elif 'categoria' in col_lower or 'category' in col_lower or 'tipo' in col_lower or 'rubro' in col_lower or 'subrubro' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'categoria'
-            elif 'stock' in col_lower or 'cantidad' in col_lower or 'q.' in col_lower or 'inner' in col_lower or 'master' in col_lower:
+                    logger.info(f"  -> Mapeada a 'categoria'")
+            elif 'stock' in col_lower or 'cantidad' in col_lower or 'q.' in col_lower or 'inner' in col_lower or 'master' in col_lower or 'pallet' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'stock'
+                    logger.info(f"  -> Mapeada a 'stock'")
+            else:
+                logger.info(f"  -> No mapeada")
         
         # Renombrar columnas
         df = df.rename(columns=columnas_normalizadas)
@@ -146,7 +156,24 @@ class ExcelParser:
             logger.info(f"Columnas finales: {list(df.columns)}")
             
             # Normalizar columnas
-            df = self.normalizar_columnas(df)
+            df_normalizado = self.normalizar_columnas(df)
+            logger.info(f"Columnas después de normalizar: {list(df_normalizado.columns)}")
+            
+            # Verificar qué columnas se mapearon
+            columnas_mapeadas = {}
+            for col_original in df.columns:
+                if col_original in df_normalizado.columns:
+                    columnas_mapeadas[col_original] = col_original
+                else:
+                    # Buscar a qué se mapeó
+                    for col_nueva in df_normalizado.columns:
+                        if col_original in df_normalizado.columns:
+                            columnas_mapeadas[col_original] = col_nueva
+                            break
+            
+            logger.info(f"Columnas mapeadas: {columnas_mapeadas}")
+            
+            df = df_normalizado
             
             # Convertir a productos
             productos = self.convertir_a_productos(df)
@@ -161,24 +188,37 @@ class ExcelParser:
     def fila_a_producto(self, row: pd.Series, index: int) -> Optional[Producto]:
         """Convierte una fila del DataFrame a un objeto Producto"""
         try:
+            logger.info(f"Procesando fila {index}: {dict(row)}")
+            
             # Extraer código
             codigo = self.extraer_codigo(row)
+            logger.info(f"  Código extraído: {codigo}")
             
             # Extraer nombre
             nombre = self.extraer_nombre(row)
+            logger.info(f"  Nombre extraído: {nombre}")
             
             # Extraer capacidad
             capacidad = self.extraer_capacidad(row)
+            logger.info(f"  Capacidad extraída: {capacidad}")
             
             # Determinar marca
             marca = self.determinar_marca(row, codigo)
+            logger.info(f"  Marca determinada: {marca}")
             
             # Determinar canal (usar categoría si está disponible)
             canal = self.determinar_canal(row)
+            logger.info(f"  Canal determinado: {canal}")
             
             # Extraer precios
             precio_base = self.extraer_precio_base(row)
             precio_final = self.extraer_precio_final(row)
+            logger.info(f"  Precios extraídos: base={precio_base}, final={precio_final}")
+            
+            # Verificar que tengamos al menos código o nombre
+            if codigo == "SIN_CODIGO" and nombre == "Producto sin nombre":
+                logger.warning(f"Fila {index} sin código ni nombre válido, saltando...")
+                return None
             
             # Crear producto
             producto = Producto(
@@ -192,6 +232,7 @@ class ExcelParser:
                 margen=0.0  # Se calculará después
             )
             
+            logger.info(f"  Producto creado exitosamente: {producto.codigo} - {producto.nombre}")
             return producto
             
         except Exception as e:
