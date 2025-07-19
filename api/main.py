@@ -3,15 +3,15 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import logging
 import io
-import os
-import json
+
+# Importar módulos de la fase 2
+from .logic import PricingLogic
+from .openai_helper import OpenAIHelper
+from .parser import ExcelParser
 
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Detectar si estamos en Vercel
-IS_VERCEL = os.environ.get('VERCEL') == '1'
 
 # Crear aplicación FastAPI
 app = FastAPI(
@@ -25,557 +25,374 @@ templates = Jinja2Templates(directory="templates")
 
 # Variables globales para almacenar productos procesados
 productos_actuales = []
+pricing_logic = PricingLogic()
+openai_helper = OpenAIHelper()
+excel_parser = ExcelParser()
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Página principal con panel de productos"""
     try:
-        return HTMLResponse(content="""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Acubat - Sistema de Pricing</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-            <style>
-                .upload-area {
-                    border: 2px dashed #007bff;
-                    border-radius: 10px;
-                    padding: 40px;
-                    text-align: center;
-                    background: #f8f9fa;
-                    transition: all 0.3s ease;
-                    cursor: pointer;
-                }
-                .upload-area:hover {
-                    border-color: #0056b3;
-                    background: #e9ecef;
-                }
-                .upload-area.dragover {
-                    border-color: #28a745;
-                    background: #d4edda;
-                }
-                .conversion-progress {
-                    display: none;
-                    margin-top: 20px;
-                }
-                .pdf-preview {
-                    max-height: 300px;
-                    overflow-y: auto;
-                    border: 1px solid #ddd;
-                    padding: 10px;
-                    background: white;
-                    margin-top: 10px;
-                }
-                .stats-card {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    border-radius: 15px;
-                    padding: 20px;
-                    margin-bottom: 20px;
-                }
-                .btn-convert {
-                    background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-                    border: none;
-                    color: white;
-                    padding: 10px 20px;
-                    border-radius: 25px;
-                    transition: all 0.3s ease;
-                }
-                .btn-convert:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-md-3 bg-light p-4 min-vh-100">
-                        <h4 class="mb-4">
-                            <i class="fas fa-chart-line text-primary"></i>
-                            Rating: Calificación
-                        </h4>
-                        
-                        <div class="stats-card">
-                            <h2 class="display-4 text-center" id="totalProductos">0</h2>
-                            <p class="text-center mb-0">Productos Cargados</p>
-                        </div>
-
-                        <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                            <h2 class="display-4 text-center" id="totalAlertas">0</h2>
-                            <p class="text-center mb-0">Con Alertas</p>
-                        </div>
-
-                        <div class="mt-4">
-                            <h5><i class="fas fa-filter text-info"></i> Filtros</h5>
-                            <select id="filtroCanal" class="form-select mb-2">
-                                <option value="">Todos los canales</option>
-                            </select>
-                            
-                            <select id="filtroMarca" class="form-select mb-2">
-                                <option value="">Todas las marcas</option>
-                            </select>
-                            
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="filtroAlertas">
-                                <label class="form-check-label" for="filtroAlertas">
-                                    Solo con alertas
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <button class="btn btn-success w-100 mb-2" onclick="exportarCSV()">
-                                <i class="fas fa-download"></i> Exportar CSV
-                            </button>
-                            
-                            <div class="alert alert-info alert-sm">
-                                <i class="fas fa-info-circle"></i>
-                                Modo Vercel - Conversión en línea
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-9 p-4">
-                        <h1 class="mb-4">
-                            <i class="fas fa-rocket text-primary"></i>
-                            AcuBat - Sistema de Pricing Inteligente
-                        </h1>
-
-                        <div class="alert alert-success">
-                            <h4>🚀 Sistema Funcionando en Vercel</h4>
-                            <p>El sistema está funcionando en modo optimizado para Vercel con conversión PDF en línea.</p>
-                            <ul>
-                                <li>✅ Conversión PDF en línea (sin servidor)</li>
-                                <li>✅ Procesamiento de Excel/CSV</li>
-                                <li>✅ Exportación de datos</li>
-                                <li>✅ Filtros y análisis</li>
-                            </ul>
-                        </div>
-
-                        <div class="card shadow-sm">
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <i class="fas fa-cloud-upload-alt text-primary"></i>
-                                    Cargar Lista de Precios
-                                </h5>
-                                
-                                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
-                                    <h5>Arrastra tu archivo aquí</h5>
-                                    <p class="text-muted">Soporta Excel (.xlsx, .xls), CSV (.csv) y PDF (.pdf)</p>
-                                    <button class="btn btn-primary">
-                                        <i class="fas fa-file-upload"></i>
-                                        Seleccionar Archivo
-                                    </button>
-                                </div>
-
-                                <div id="pdfConversion" class="conversion-progress">
-                                    <div class="alert alert-info">
-                                        <h6><i class="fas fa-cog fa-spin"></i> Convirtiendo PDF a Excel...</h6>
-                                        <div class="progress">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                 role="progressbar" style="width: 0%"></div>
-                                        </div>
-                                        <small class="text-muted">Procesando página <span id="currentPage">1</span> de <span id="totalPages">?</span></small>
-                                    </div>
-                                </div>
-
-                                <div id="pdfPreview" class="pdf-preview" style="display: none;">
-                                    <h6><i class="fas fa-eye"></i> Vista Previa del PDF</h6>
-                                    <div id="pdfContent"></div>
-                                    <button class="btn btn-convert mt-2" onclick="convertirPDFaExcel()">
-                                        <i class="fas fa-magic"></i> Convertir a Excel
-                                    </button>
-                                </div>
-
-                                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf" style="display: none;">
-                            </div>
-                        </div>
-
-                        <div class="mt-4" id="resultadosSection" style="display: none;">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h4><i class="fas fa-list text-success"></i> Productos Procesados</h4>
-                                <div>
-                                    <button class="btn btn-outline-primary btn-sm" onclick="limpiarProductos()">
-                                        <i class="fas fa-trash"></i> Limpiar
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>Producto</th>
-                                            <th>Marca</th>
-                                            <th>Canal</th>
-                                            <th>Precio Base</th>
-                                            <th>Precio Final</th>
-                                            <th>Margen</th>
-                                            <th>Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="productosTable">
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-            <script>
-                // Configurar PDF.js
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-                let pdfData = null;
-                let currentFile = null;
-                let productosActuales = [];
-
-                // Drag and drop
-                const uploadArea = document.getElementById('uploadArea');
-                const fileInput = document.getElementById('fileInput');
-
-                uploadArea.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    uploadArea.classList.add('dragover');
-                });
-
-                uploadArea.addEventListener('dragleave', () => {
-                    uploadArea.classList.remove('dragover');
-                });
-
-                uploadArea.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    uploadArea.classList.remove('dragover');
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        handleFile(files[0]);
-                    }
-                });
-
-                fileInput.addEventListener('change', (e) => {
-                    if (e.target.files.length > 0) {
-                        handleFile(e.target.files[0]);
-                    }
-                });
-
-                function handleFile(file) {
-                    currentFile = file;
-                    
-                    if (file.type === 'application/pdf') {
-                        procesarPDFEnLinea(file);
-                    } else {
-                        procesarArchivoEnLinea(file);
-                    }
-                }
-
-                async function procesarPDFEnLinea(file) {
-                    try {
-                        document.getElementById('pdfConversion').style.display = 'block';
-                        const progressBar = document.querySelector('.progress-bar');
-                        
-                        const arrayBuffer = await file.arrayBuffer();
-                        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-                        
-                        document.getElementById('totalPages').textContent = pdf.numPages;
-                        
-                        let extractedText = '';
-                        
-                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                            document.getElementById('currentPage').textContent = pageNum;
-                            progressBar.style.width = `${(pageNum / pdf.numPages) * 100}%`;
-                            
-                            const page = await pdf.getPage(pageNum);
-                            const textContent = await page.getTextContent();
-                            const pageText = textContent.items.map(item => item.str).join(' ');
-                            extractedText += pageText + '\\n';
-                            
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                        }
-                        
-                        document.getElementById('pdfConversion').style.display = 'none';
-                        mostrarVistaPreviaPDF(extractedText);
-                        
-                    } catch (error) {
-                        console.error('Error procesando PDF:', error);
-                        alert('Error al procesar el PDF. Intenta con otro archivo.');
-                        document.getElementById('pdfConversion').style.display = 'none';
-                    }
-                }
-
-                function mostrarVistaPreviaPDF(texto) {
-                    const preview = document.getElementById('pdfPreview');
-                    const content = document.getElementById('pdfContent');
-                    
-                    const previewText = texto.substring(0, 1000) + (texto.length > 1000 ? '...' : '');
-                    content.innerHTML = `<pre style="font-size: 12px; white-space: pre-wrap;">${previewText}</pre>`;
-                    
-                    preview.style.display = 'block';
-                    pdfData = texto;
-                }
-
-                function convertirPDFaExcel() {
-                    if (!pdfData || !currentFile) {
-                        alert('No hay datos PDF para convertir');
-                        return;
-                    }
-                    
-                    try {
-                        const lineas = pdfData.split('\\n').filter(line => line.trim());
-                        const datos = [];
-                        
-                        lineas.forEach((linea, index) => {
-                            const columnas = linea.split(/\\s+/).filter(col => col.trim());
-                            
-                            if (columnas.length >= 2) {
-                                const fila = {
-                                    nombre: columnas[0] || `Producto ${index + 1}`,
-                                    precio_base: parseFloat(columnas[1]) || 0,
-                                    marca: columnas[2] || 'Sin marca',
-                                    canal: columnas[3] || 'General'
-                                };
-                                datos.push(fila);
-                            }
-                        });
-                        
-                        procesarProductos(datos);
-                        document.getElementById('pdfPreview').style.display = 'none';
-                        
-                    } catch (error) {
-                        console.error('Error convirtiendo PDF:', error);
-                        alert('Error al convertir PDF. Intenta subir el archivo original.');
-                    }
-                }
-
-                async function procesarArchivoEnLinea(file) {
-                    try {
-                        if (file.name.endsWith('.csv')) {
-                            const text = await file.text();
-                            const lineas = text.split('\\n');
-                            const headers = lineas[0].split(',').map(h => h.trim());
-                            const datos = [];
-                            
-                            for (let i = 1; i < lineas.length; i++) {
-                                if (lineas[i].trim()) {
-                                    const valores = lineas[i].split(',').map(v => v.trim());
-                                    const fila = {};
-                                    headers.forEach((header, index) => {
-                                        fila[header] = valores[index] || '';
-                                    });
-                                    datos.push(fila);
-                                }
-                            }
-                            
-                            procesarProductos(datos);
-                        } else {
-                            // Para Excel, usar XLSX.js
-                            const arrayBuffer = await file.arrayBuffer();
-                            const workbook = XLSX.read(arrayBuffer, {type: 'array'});
-                            const sheetName = workbook.SheetNames[0];
-                            const worksheet = workbook.Sheets[sheetName];
-                            const datos = XLSX.utils.sheet_to_json(worksheet);
-                            
-                            procesarProductos(datos);
-                        }
-                    } catch (error) {
-                        console.error('Error procesando archivo:', error);
-                        alert('Error al procesar el archivo. Verifica el formato.');
-                    }
-                }
-
-                function procesarProductos(datos) {
-                    // Simular procesamiento de pricing
-                    productosActuales = datos.map((item, index) => {
-                        const precioBase = parseFloat(item.precio_base || item.precio || item.Precio || 0);
-                        const markup = 0.15; // 15% markup
-                        const precioFinal = precioBase * (1 + markup);
-                        const margen = ((precioFinal - precioBase) / precioFinal) * 100;
-                        
-                        return {
-                            nombre: item.nombre || item.producto || item.Producto || `Producto ${index + 1}`,
-                            marca: item.marca || item.Marca || 'Sin marca',
-                            canal: item.canal || item.Canal || 'General',
-                            precio_base: precioBase,
-                            precio_final: precioFinal,
-                            margen: margen,
-                            alertas: margen < 10 ? ['Margen bajo'] : []
-                        };
-                    });
-                    
-                    actualizarInterfaz();
-                }
-
-                function actualizarInterfaz() {
-                    // Actualizar contadores
-                    document.getElementById('totalProductos').textContent = productosActuales.length;
-                    const alertas = productosActuales.filter(p => p.alertas.length > 0).length;
-                    document.getElementById('totalAlertas').textContent = alertas;
-                    
-                    // Actualizar tabla
-                    const tbody = document.getElementById('productosTable');
-                    tbody.innerHTML = '';
-                    
-                    productosActuales.forEach(producto => {
-                        const row = document.createElement('tr');
-                        row.className = 'producto-row';
-                        row.dataset.canal = producto.canal;
-                        row.dataset.marca = producto.marca;
-                        row.dataset.alertas = producto.alertas.length > 0 ? 'true' : 'false';
-                        
-                        row.innerHTML = `
-                            <td>${producto.nombre}</td>
-                            <td>${producto.marca}</td>
-                            <td>${producto.canal}</td>
-                            <td>$${producto.precio_base.toFixed(2)}</td>
-                            <td>$${producto.precio_final.toFixed(2)}</td>
-                            <td>${producto.margen.toFixed(1)}%</td>
-                            <td>
-                                ${producto.alertas.length > 0 ? 
-                                    '<span class="badge bg-warning"><i class="fas fa-exclamation-triangle"></i> Alerta</span>' :
-                                    '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>'
-                                }
-                            </td>
-                        `;
-                        
-                        tbody.appendChild(row);
-                    });
-                    
-                    // Mostrar sección de resultados
-                    document.getElementById('resultadosSection').style.display = 'block';
-                    
-                    // Actualizar filtros
-                    actualizarFiltros();
-                }
-
-                function actualizarFiltros() {
-                    const canales = [...new Set(productosActuales.map(p => p.canal))];
-                    const marcas = [...new Set(productosActuales.map(p => p.marca))];
-                    
-                    const filtroCanal = document.getElementById('filtroCanal');
-                    const filtroMarca = document.getElementById('filtroMarca');
-                    
-                    filtroCanal.innerHTML = '<option value="">Todos los canales</option>';
-                    filtroMarca.innerHTML = '<option value="">Todas las marcas</option>';
-                    
-                    canales.forEach(canal => {
-                        filtroCanal.innerHTML += `<option value="${canal}">${canal}</option>`;
-                    });
-                    
-                    marcas.forEach(marca => {
-                        filtroMarca.innerHTML += `<option value="${marca}">${marca}</option>`;
-                    });
-                }
-
-                // Filtros
-                document.getElementById('filtroCanal').addEventListener('change', aplicarFiltros);
-                document.getElementById('filtroMarca').addEventListener('change', aplicarFiltros);
-                document.getElementById('filtroAlertas').addEventListener('change', aplicarFiltros);
-
-                function aplicarFiltros() {
-                    const canal = document.getElementById('filtroCanal').value;
-                    const marca = document.getElementById('filtroMarca').value;
-                    const alertas = document.getElementById('filtroAlertas').checked;
-                    
-                    const filas = document.querySelectorAll('.producto-row');
-                    
-                    filas.forEach(fila => {
-                        let mostrar = true;
-                        
-                        if (canal && fila.dataset.canal !== canal) mostrar = false;
-                        if (marca && fila.dataset.marca !== marca) mostrar = false;
-                        if (alertas && fila.dataset.alertas !== 'true') mostrar = false;
-                        
-                        fila.style.display = mostrar ? '' : 'none';
-                    });
-                }
-
-                function exportarCSV() {
-                    if (productosActuales.length === 0) {
-                        alert('No hay productos para exportar');
-                        return;
-                    }
-                    
-                    const headers = ['Producto', 'Marca', 'Canal', 'Precio Base', 'Precio Final', 'Margen', 'Alertas'];
-                    const csvContent = [
-                        headers.join(','),
-                        ...productosActuales.map(p => [
-                            p.nombre,
-                            p.marca,
-                            p.canal,
-                            p.precio_base,
-                            p.precio_final,
-                            p.margen.toFixed(1),
-                            p.alertas.join(';')
-                        ].join(','))
-                    ].join('\\n');
-                    
-                    const blob = new Blob([csvContent], {type: 'text/csv'});
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'productos_pricing.csv';
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                }
-
-                function limpiarProductos() {
-                    if (confirm('¿Estás seguro de que quieres limpiar todos los productos?')) {
-                        productosActuales = [];
-                        document.getElementById('resultadosSection').style.display = 'none';
-                        document.getElementById('totalProductos').textContent = '0';
-                        document.getElementById('totalAlertas').textContent = '0';
-                    }
-                }
-            </script>
-        </body>
-        </html>
-        """)
-
+        # Generar resúmenes
+        resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_actuales) if productos_actuales else {}
+        resumen_canales = pricing_logic.obtener_resumen_canales(productos_actuales) if productos_actuales else {}
+        
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "productos": productos_actuales if productos_actuales else [],
+            "total_productos": len(productos_actuales) if productos_actuales else 0,
+            "productos_con_alertas": len([p for p in productos_actuales if p.alertas]) if productos_actuales else 0,
+            "openai_disponible": openai_helper.esta_disponible(),
+            "resumen_marcas": resumen_marcas,
+            "resumen_canales": resumen_canales
+        })
     except Exception as e:
         logger.error(f"Error en página principal: {e}")
+        # Retornar una página simple en caso de error
         return HTMLResponse(content=f"""
         <!DOCTYPE html>
         <html>
-        <head>
-            <title>Acubat - Error</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        </head>
+        <head><title>Acubat - Error</title></head>
         <body>
-            <div class="container mt-5">
-                <h1>🚀 Backend Acubat</h1>
-                <div class="alert alert-danger">
-                    <h4>❌ Error cargando la página</h4>
-                    <p>{str(e)}</p>
-                </div>
-                <p>Productos cargados: {len(productos_actuales) if productos_actuales else 0}</p>
-                <a href="/health" class="btn btn-primary">Health Check</a>
-            </div>
+            <h1>Backend Acubat</h1>
+            <p>Error cargando la página: {str(e)}</p>
+            <p>Productos cargados: {len(productos_actuales) if productos_actuales else 0}</p>
+            <a href="/health">Health Check</a>
         </body>
         </html>
         """)
 
-@app.get("/health")
-async def health_check():
-    """Health check para verificar que la aplicación funciona"""
-    return {
-        "status": "healthy", 
-        "message": "Backend Acubat funcionando en modo Vercel",
-        "is_vercel": IS_VERCEL,
-        "productos_cargados": len(productos_actuales) if productos_actuales else 0
-    }
+@app.get("/alertas", response_class=HTMLResponse)
+async def alertas(request: Request):
+    """Página de alertas"""
+    try:
+        productos_con_alertas = [p for p in productos_actuales if p.get('alertas')] if productos_actuales else []
+        return templates.TemplateResponse("alertas.html", {
+            "request": request,
+            "productos": productos_con_alertas,
+            "total_alertas": len(productos_con_alertas)
+        })
+    except Exception as e:
+        logger.error(f"Error en página de alertas: {e}")
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Acubat - Alertas</title></head>
+        <body>
+            <h1>Alertas</h1>
+            <p>Error cargando alertas: {str(e)}</p>
+            <a href="/">Volver al inicio</a>
+        </body>
+        </html>
+        """)
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Endpoint para subir archivo Excel y procesar con pricing"""
+    try:
+        # Verificar que sea un archivo soportado
+        if not file.filename.endswith(('.xlsx', '.xls', '.csv', '.pdf')):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls), CSV (.csv) o PDF (.pdf)")
+        
+        # Leer el archivo
+        contenido = file.file.read()
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        # Guardar archivo temporalmente
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Verificar si es un PDF y convertirlo
+            if file.filename.endswith('.pdf'):
+                logger.info(f"Detectado archivo PDF: {file.filename}")
+                
+                # Importar convertidor PDF Lite para Vercel
+                try:
+                    from pdf_converter import PDFConverter
+                    pdf_converter = PDFConverter()
+                except ImportError:
+                    # Fallback a versión lite si las dependencias pesadas no están disponibles
+                    from .pdf_converter_lite import PDFConverterLite
+                    pdf_converter = PDFConverterLite()
+                
+                # Convertir PDF a Excel
+                excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)
+                
+                if excel_path:
+                    logger.info(f"PDF convertido exitosamente a: {excel_path}")
+                    # Usar el archivo Excel convertido
+                    productos = excel_parser.leer_excel(excel_path)
+                    
+                    # Limpiar archivo temporal Excel
+                    if os.path.exists(excel_path):
+                        os.unlink(excel_path)
+                else:
+                    raise HTTPException(status_code=400, detail="No se pudo convertir el PDF. Verifica que contenga tablas o texto estructurado.")
+            else:
+                # Procesar archivo Excel/CSV directamente
+                productos = excel_parser.leer_excel(temp_file_path)
+            
+            if not productos:
+                raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
+            
+            # Aplicar pricing logic
+            productos_procesados = pricing_logic.procesar_productos(productos)
+            
+            # Analizar con OpenAI si está disponible
+            if openai_helper.esta_disponible():
+                productos_analizados = openai_helper.analizar_lote_productos(productos_procesados)
+                productos_procesados = productos_analizados
+            
+            # Actualizar productos globales
+            global productos_actuales
+            productos_actuales = productos_procesados
+            
+            # Generar resúmenes
+            resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_procesados)
+            resumen_canales = pricing_logic.obtener_resumen_canales(productos_procesados)
+            
+            productos_con_alertas = len([p for p in productos_procesados if p.alertas])
+            
+            # Determinar tipo de archivo procesado
+            archivo_tipo = "PDF convertido" if file.filename.endswith('.pdf') else "Excel/CSV"
+            
+            return {
+                "mensaje": f"Archivo {archivo_tipo} procesado exitosamente con pricing",
+                "productos_procesados": len(productos_procesados),
+                "productos_con_alertas": productos_con_alertas,
+                "resumen_marcas": resumen_marcas,
+                "resumen_canales": resumen_canales,
+                "openai_utilizado": openai_helper.esta_disponible(),
+                "archivo_original": file.filename,
+                "tipo_procesamiento": archivo_tipo
+            }
+            
+        finally:
+            # Limpiar archivo temporal
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al procesar archivo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
 
 @app.get("/api/status")
 async def get_status():
     """Obtiene el estado del sistema"""
     return {
         "status": "ok",
-        "mensaje": "Aplicación funcionando correctamente en modo Vercel",
-        "productos_cargados": len(productos_actuales) if productos_actuales else 0,
-        "is_vercel": IS_VERCEL
-    } 
+        "mensaje": "Aplicación funcionando correctamente",
+        "productos_cargados": len(productos_actuales)
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check para verificar que la aplicación funciona"""
+    return {"status": "healthy", "message": "Backend Acubat funcionando"}
+
+@app.get("/export/csv")
+async def export_csv():
+    """Exporta los productos actuales a CSV"""
+    try:
+        if not productos_actuales:
+            raise HTTPException(status_code=404, detail="No hay productos para exportar")
+        
+        csv_content = pricing_logic.exportar_a_csv(productos_actuales)
+        
+        # Crear respuesta de streaming
+        csv_io = io.StringIO(csv_content)
+        
+        return StreamingResponse(
+            iter([csv_io.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=productos_pricing.csv"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exportando CSV: {e}")
+        raise HTTPException(status_code=500, detail=f"Error exportando CSV: {str(e)}")
+
+@app.get("/api/analisis-openai")
+async def obtener_analisis_openai():
+    """Obtiene análisis de OpenAI para los productos actuales"""
+    try:
+        if not productos_actuales:
+            raise HTTPException(status_code=404, detail="No hay productos para analizar")
+        
+        if not openai_helper.esta_disponible():
+            raise HTTPException(status_code=503, detail="OpenAI no está disponible")
+        
+        resumen = openai_helper.generar_resumen_analisis(productos_actuales)
+        
+        return {
+            "resumen": resumen,
+            "total_productos": len(productos_actuales),
+            "productos_con_alertas": len([p for p in productos_actuales if p.alertas])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo análisis OpenAI: {e}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo análisis: {str(e)}")
+
+@app.get("/api/filtrar")
+async def filtrar_productos(
+    canal: str = None,
+    marca: str = None,
+    con_alertas: bool = None
+):
+    """Filtra productos según criterios"""
+    try:
+        if not productos_actuales:
+            return {"productos": [], "total": 0}
+        
+        productos_filtrados = productos_actuales.copy()
+        
+        # Filtrar por canal
+        if canal:
+            productos_filtrados = [p for p in productos_filtrados if p.canal.value == canal.lower()]
+        
+        # Filtrar por marca
+        if marca:
+            productos_filtrados = [p for p in productos_filtrados if p.marca.value == marca.lower()]
+        
+        # Filtrar por alertas
+        if con_alertas is not None:
+            if con_alertas:
+                productos_filtrados = [p for p in productos_filtrados if p.alertas]
+            else:
+                productos_filtrados = [p for p in productos_filtrados if not p.alertas]
+        
+        return {
+            "productos": productos_filtrados,
+            "total": len(productos_filtrados),
+            "filtros_aplicados": {
+                "canal": canal,
+                "marca": marca,
+                "con_alertas": con_alertas
+            }
+        }
+        
+            except Exception as e:
+            logger.error(f"Error filtrando productos: {e}")
+            raise HTTPException(status_code=500, detail=f"Error filtrando productos: {str(e)}")
+
+@app.post("/convertir-pdf")
+async def convertir_pdf(file: UploadFile = File(...)):
+    """Endpoint específico para convertir PDFs a Excel"""
+    try:
+        # Verificar que sea un archivo PDF
+        if not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF (.pdf)")
+        
+        # Leer el archivo
+        contenido = file.file.read()
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        # Guardar archivo temporalmente
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Importar convertidor PDF
+            from pdf_converter import PDFConverter
+            pdf_converter = PDFConverter()
+            
+            # Convertir PDF a Excel
+            excel_path = pdf_converter.convert_pdf_to_excel(temp_file_path)
+            
+            if excel_path:
+                # Leer el archivo Excel convertido
+                import pandas as pd
+                df = pd.read_excel(excel_path)
+                
+                # Preparar respuesta
+                response_data = {
+                    "mensaje": "PDF convertido exitosamente",
+                    "archivo_original": file.filename,
+                    "archivo_convertido": os.path.basename(excel_path),
+                    "filas_procesadas": len(df),
+                    "columnas": list(df.columns),
+                    "preview": df.head(5).to_dict('records')
+                }
+                
+                # Limpiar archivo temporal Excel
+                if os.path.exists(excel_path):
+                    os.unlink(excel_path)
+                
+                return response_data
+            else:
+                raise HTTPException(status_code=400, detail="No se pudo convertir el PDF. Verifica que contenga tablas o texto estructurado.")
+                
+        finally:
+            # Limpiar archivo temporal PDF
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al convertir PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al convertir PDF: {str(e)}")
+
+@app.get("/api/reporte-pricing")
+async def obtener_reporte_pricing():
+    """Obtener reporte completo de pricing"""
+    try:
+        if not productos_actuales:
+            raise HTTPException(status_code=404, detail="No hay productos para analizar")
+        
+        # Generar reporte completo
+        reporte = pricing_logic.generar_reporte_pricing(productos_actuales)
+        
+        return {
+            "mensaje": "Reporte de pricing generado exitosamente",
+            "reporte": reporte,
+            "fecha_generacion": "2024-01-01"  # Aquí podrías usar datetime.now()
+        }
+    except Exception as e:
+        logger.error(f"Error generando reporte de pricing: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
+
+@app.get("/api/sugerencias-precio/{codigo_producto}")
+async def obtener_sugerencias_precio(codigo_producto: str):
+    """Obtener sugerencias de precio para un producto específico"""
+    try:
+        if not productos_actuales:
+            raise HTTPException(status_code=404, detail="No hay productos cargados")
+        
+        # Buscar producto por código
+        producto = next((p for p in productos_actuales if p.codigo == codigo_producto), None)
+        
+        if not producto:
+            raise HTTPException(status_code=404, detail=f"Producto {codigo_producto} no encontrado")
+        
+        # Generar sugerencias
+        sugerencias = pricing_logic.generar_sugerencias_precio(producto)
+        
+        return {
+            "producto": {
+                "codigo": producto.codigo,
+                "nombre": producto.nombre,
+                "precio_actual": producto.precio_final,
+                "margen_actual": producto.margen
+            },
+            "sugerencias": sugerencias
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo sugerencias para {codigo_producto}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo sugerencias: {str(e)}") 
