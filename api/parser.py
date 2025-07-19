@@ -110,35 +110,50 @@ class ExcelParser:
     def normalizar_columnas(self, df: pd.DataFrame) -> pd.DataFrame:
         """Normaliza los nombres de las columnas del DataFrame"""
         try:
-            # Mapeo de nombres de columnas
+            # Mapeo de nombres de columnas específico para archivos de baterías
             mapeo_columnas = {}
             
             for col in df.columns:
                 col_lower = str(col).lower().strip()
                 logger.info(f"Procesando columna: '{col}' -> '{col_lower}'")
                 
-                # Mapeo flexible de columnas
-                if any(keyword in col_lower for keyword in ['modelo', 'codigo', 'code']):
+                # Mapeo específico para archivos de baterías
+                if any(keyword in col_lower for keyword in ['codigo baterias', 'codigo', 'modelo', 'code']):
                     mapeo_columnas[col] = 'codigo'
                     logger.info(f"  -> Mapeada a 'codigo'")
-                elif any(keyword in col_lower for keyword in ['descripcion', 'nombre', 'producto', 'name']):
+                elif any(keyword in col_lower for keyword in ['denominacion comercial', 'denominacion', 'descripcion', 'nombre', 'producto', 'name']):
                     mapeo_columnas[col] = 'nombre'
                     logger.info(f"  -> Mapeada a 'nombre'")
-                elif any(keyword in col_lower for keyword in ['precio lista', 'precio_base', 'base']):
+                elif any(keyword in col_lower for keyword in ['precio de lista', 'precio lista', 'precio_base', 'base', 'lista']):
                     mapeo_columnas[col] = 'precio_base'
                     logger.info(f"  -> Mapeada a 'precio_base'")
-                elif any(keyword in col_lower for keyword in ['pvp', 'precio final', 'final', 'venta']):
+                elif any(keyword in col_lower for keyword in ['pvp', 'precio final', 'final', 'venta', 'precio venta']):
                     mapeo_columnas[col] = 'precio_final'
                     logger.info(f"  -> Mapeada a 'precio_final'")
                 elif any(keyword in col_lower for keyword in ['marca', 'brand']):
                     mapeo_columnas[col] = 'marca'
                     logger.info(f"  -> Mapeada a 'marca'")
-                elif any(keyword in col_lower for keyword in ['rubro', 'categoria', 'category']):
+                elif any(keyword in col_lower for keyword in ['tipo', 'rubro', 'categoria', 'category', 'linea']):
                     mapeo_columnas[col] = 'categoria'
                     logger.info(f"  -> Mapeada a 'categoria'")
-                elif any(keyword in col_lower for keyword in ['stock', 'cantidad', 'qty', 'q. pallet']):
+                elif any(keyword in col_lower for keyword in ['stock', 'cantidad', 'qty', 'q. pallet', 'disponible']):
                     mapeo_columnas[col] = 'stock'
                     logger.info(f"  -> Mapeada a 'stock'")
+                elif any(keyword in col_lower for keyword in ['c20', 'ah', 'amper', 'amp', 'capacidad']):
+                    mapeo_columnas[col] = 'capacidad'
+                    logger.info(f"  -> Mapeada a 'capacidad'")
+                elif any(keyword in col_lower for keyword in ['gtia', 'garantia', 'warranty']):
+                    mapeo_columnas[col] = 'garantia'
+                    logger.info(f"  -> Mapeada a 'garantia'")
+                elif any(keyword in col_lower for keyword in ['largo', 'length']):
+                    mapeo_columnas[col] = 'largo'
+                    logger.info(f"  -> Mapeada a 'largo'")
+                elif any(keyword in col_lower for keyword in ['ancho', 'width']):
+                    mapeo_columnas[col] = 'ancho'
+                    logger.info(f"  -> Mapeada a 'ancho'")
+                elif any(keyword in col_lower for keyword in ['alto', 'height']):
+                    mapeo_columnas[col] = 'alto'
+                    logger.info(f"  -> Mapeada a 'alto'")
                 else:
                     logger.info(f"  -> No mapeada (columna opcional)")
             
@@ -189,13 +204,13 @@ class ExcelParser:
         """Convierte una fila del DataFrame a un objeto Producto"""
         try:
             # Extraer datos básicos con valores por defecto
-            codigo = str(row.get('codigo', f'PROD_{index}')).strip()
+            codigo = str(row.get('codigo', f'BAT_{index}')).strip()
             if pd.isna(codigo) or codigo == '':
-                codigo = f'PROD_{index}'
+                codigo = f'BAT_{index}'
             
-            nombre = str(row.get('nombre', f'Producto {index}')).strip()
+            nombre = str(row.get('nombre', f'Batería {index}')).strip()
             if pd.isna(nombre) or nombre == '':
-                nombre = f'Producto {index}'
+                nombre = f'Batería {index}'
             
             # Extraer precios con manejo de errores
             precio_base = self.extraer_precio_seguro(row, 'precio_base', 0.0)
@@ -218,7 +233,7 @@ class ExcelParser:
                 nombre=nombre,
                 marca=marca,
                 canal=canal,
-                categoria="General",
+                categoria="Baterías",
                 precio_base=precio_base,
                 precio_final=precio_final,
                 stock=0,
@@ -228,7 +243,7 @@ class ExcelParser:
                 margen=0.0
             )
             
-            logger.info(f"Producto creado: {codigo} - {nombre}")
+            logger.info(f"Producto creado: {codigo} - {nombre} - Precio: ${precio_base}")
             return producto
             
         except Exception as e:
@@ -247,10 +262,13 @@ class ExcelParser:
             if not valor_str:
                 return valor_default
             
-            # Remover caracteres no numéricos excepto punto y coma
-            valor_limpio = re.sub(r'[^\d.,]', '', valor_str)
+            # Remover caracteres no numéricos excepto punto, coma y símbolo de peso
+            valor_limpio = re.sub(r'[^\d.,$]', '', valor_str)
             if not valor_limpio:
                 return valor_default
+            
+            # Remover símbolo de peso si existe
+            valor_limpio = valor_limpio.replace('$', '').replace(' ', '')
             
             # Convertir coma a punto si es necesario
             valor_limpio = valor_limpio.replace(',', '.')
@@ -278,12 +296,21 @@ class ExcelParser:
                 if clave in codigo_lower:
                     return marca_enum
             
-            # Por defecto
-            return Marca.ACUBAT
+            # Determinar por tipo de producto (baterías)
+            tipo_str = str(row.get('categoria', '')).lower().strip()
+            if 'estandar' in tipo_str:
+                return Marca.MOURA
+            elif 'asiatica' in tipo_str:
+                return Marca.SOLAR
+            elif 'acubat' in tipo_str:
+                return Marca.ACUBAT
+            
+            # Por defecto para baterías
+            return Marca.MOURA
             
         except Exception as e:
             logger.warning(f"Error determinando marca: {e}")
-            return Marca.ACUBAT
+            return Marca.MOURA
 
     def determinar_canal_seguro(self, row: pd.Series) -> Canal:
         """Determina canal de forma segura"""
@@ -305,6 +332,11 @@ class ExcelParser:
     def extraer_capacidad_segura(self, row: pd.Series) -> Optional[str]:
         """Extrae capacidad de forma segura"""
         try:
+            # Buscar en columna específica de capacidad
+            capacidad = row.get('capacidad')
+            if pd.notna(capacidad) and capacidad != '':
+                return str(capacidad).strip()
+            
             # Buscar en nombre o código
             nombre = str(row.get('nombre', ''))
             codigo = str(row.get('codigo', ''))
