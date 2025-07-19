@@ -313,17 +313,25 @@ async def upload_file(file: UploadFile = File(...)):
 async def upload_rentabilidades(file: UploadFile = File(...)):
     """Endpoint para subir archivo de rentabilidades"""
     try:
+        logger.info(f"=== INICIO CARGAR RENTABILIDADES ===")
+        logger.info(f"Archivo recibido: {file.filename}")
+        logger.info(f"Content-Type: {file.content_type}")
+        
         if not MODULES_AVAILABLE:
+            logger.error("Módulos no disponibles")
             raise HTTPException(status_code=503, detail="Sistema en modo básico. Módulos de procesamiento no disponibles.")
         
         # Verificar que sea un archivo Excel
         if not file.filename.endswith(('.xlsx', '.xls')):
+            logger.error(f"Tipo de archivo no soportado: {file.filename}")
             raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten archivos Excel (.xlsx, .xls) para rentabilidades")
         
         # Leer el archivo
         contenido = file.file.read()
+        logger.info(f"Contenido leído: {len(contenido)} bytes")
         
         if not contenido:
+            logger.error("Archivo vacío")
             raise HTTPException(status_code=400, detail="El archivo está vacío")
         
         logger.info(f"Procesando archivo de rentabilidades: {file.filename} ({len(contenido)} bytes)")
@@ -335,35 +343,47 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             temp_file.write(contenido)
             temp_file_path = temp_file.name
         
+        logger.info(f"Archivo temporal creado: {temp_file_path}")
+        
         try:
             # Cargar rentabilidades
+            logger.info("Iniciando carga de rentabilidades...")
             rentabilidad_cargada = pricing_logic.cargar_rentabilidades(temp_file_path)
             
             if not rentabilidad_cargada:
+                logger.error("No se pudo cargar el archivo de rentabilidades")
                 raise HTTPException(status_code=400, detail="No se pudo cargar el archivo de rentabilidades. Verifica que el archivo contenga hojas con columnas: Canal, Línea, Margen Mínimo, Margen Óptimo")
             
             # Obtener resumen de rentabilidades
+            logger.info("Obteniendo resumen de rentabilidades...")
             resumen_rentabilidad = pricing_logic.rentabilidad_validator.obtener_resumen_rentabilidad()
             
             logger.info(f"Rentabilidades cargadas exitosamente: {resumen_rentabilidad.get('total_reglas', 0)} reglas")
+            logger.info(f"=== CARGAR RENTABILIDADES EXITOSO ===")
             
             return {
                 "mensaje": f"Archivo de rentabilidades cargado exitosamente. {resumen_rentabilidad.get('total_reglas', 0)} reglas procesadas.",
                 "reglas_cargadas": resumen_rentabilidad.get('total_reglas', 0),
                 "resumen_rentabilidad": resumen_rentabilidad,
                 "archivo_original": file.filename,
-                "tamaño_archivo": len(contenido)
+                "tamaño_archivo": len(contenido),
+                "status": "success"
             }
             
         finally:
             # Limpiar archivo temporal
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
+                logger.info(f"Archivo temporal eliminado: {temp_file_path}")
         
     except HTTPException:
+        logger.error("HTTPException en cargar-rentabilidades")
         raise
     except Exception as e:
-        logger.error(f"Error al cargar rentabilidades {file.filename}: {str(e)}")
+        logger.error(f"Error inesperado en cargar-rentabilidades: {str(e)}")
+        logger.error(f"Tipo de error: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error al cargar rentabilidades: {str(e)}")
 
 @app.get("/api/estado-rentabilidad")

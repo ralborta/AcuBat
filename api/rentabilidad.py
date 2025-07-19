@@ -246,7 +246,7 @@ class RentabilidadValidator:
             canal_norm = self.normalizar_canal(canal)
             linea_norm = self.normalizar_linea(linea)
             
-            # Buscar regla correspondiente
+            # Buscar regla correspondiente usando strings
             clave = (marca_norm, canal_norm, linea_norm)
             
             if clave not in self.tabla_rentabilidad:
