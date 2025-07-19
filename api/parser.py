@@ -15,7 +15,13 @@ class ExcelParser:
             'lubeck': Marca.LUBECK,
             'solar': Marca.SOLAR,
             'zx': Marca.SOLAR,  # ZX parece ser marca solar
-            'lb': Marca.LUBECK  # LB parece ser marca Lubeck
+            'lb': Marca.LUBECK,  # LB parece ser marca Lubeck
+            'black series': Marca.ACUBAT,  # BLACK SERIES como marca premium
+            'black': Marca.ACUBAT,
+            'lüsqtoff': Marca.ACUBAT,  # LÜSQTOFF como marca principal
+            'lusqtoff': Marca.ACUBAT,
+            'accesorios': Marca.ACUBAT,  # ACCESORIOS como subcategoría
+            'accesorios lusqtoff': Marca.ACUBAT
         }
         
         # Mapeo de canales
@@ -57,9 +63,9 @@ class ExcelParser:
             'capacidad': ['ah', 'amperaje', 'capacidad_ah', 'cap', 'amperes'],
             'marca': ['brand', 'fabricante', 'marca', 'make'],
             'categoria': ['tipo', 'tipo_canal', 'categoria', 'category', 'channel', 'tipo_venta', 'rubro', 'subrubro'],
-            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost', 'precio_lista', 'precio lista'],
-            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico', 'pvp', 'pvp on line', 'pvp online'],
-            'stock': ['stock', 'cantidad', 'quantity', 'disponible', 'inventario', 'q_pallet', 'q. pallet', 'inner', 'master']
+            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost', 'precio_lista', 'precio lista', 'precio lista'],
+            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico', 'pvp', 'pvp on line', 'pvp online', 'pvp on line'],
+            'stock': ['stock', 'cantidad', 'quantity', 'disponible', 'inventario', 'q_pallet', 'q. pallet', 'inner', 'master', 'q. pallet']
         }
         
         # Normalizar nombres de columnas
@@ -119,6 +125,25 @@ class ExcelParser:
             if df.empty:
                 logger.warning("DataFrame vacío recibido")
                 return []
+            
+            # Verificar si la primera fila es un header (no datos)
+            primera_fila = df.iloc[0]
+            primera_fila_es_header = any(
+                str(val).lower() in ['marca', 'rubro', 'modelo', 'descripcion', 'precio', 'pvp', 'lista']
+                for val in primera_fila if pd.notna(val)
+            )
+            
+            if primera_fila_es_header:
+                logger.info("Detectado header en primera fila, saltando...")
+                # Usar la segunda fila como headers y saltar la primera
+                df = df.iloc[1:].reset_index(drop=True)
+                # Renombrar columnas usando la primera fila de datos
+                if len(df) > 0:
+                    df.columns = df.iloc[0]
+                    df = df.iloc[1:].reset_index(drop=True)
+            
+            logger.info(f"DataFrame después de limpiar headers: {len(df)} filas, {len(df.columns)} columnas")
+            logger.info(f"Columnas finales: {list(df.columns)}")
             
             # Normalizar columnas
             df = self.normalizar_columnas(df)
