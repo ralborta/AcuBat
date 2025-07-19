@@ -27,12 +27,15 @@ class Producto(BaseModel):
     capacidad: Optional[str] = None
     marca: Marca
     canal: Canal
+    categoria: str = "General"
     precio_base: float
     precio_final: float
-    margen: float
+    stock: int = 0
+    margen: float = 0.0
     markup_aplicado: Optional[float] = None  # Porcentaje de markup aplicado
     alertas: List[TipoAlerta] = []
     sugerencias_ai: Optional[str] = None
+    sugerencias_openai: Optional[str] = None  # Campo para compatibilidad
     fecha_procesamiento: datetime = datetime.now()
     origen_archivo: Optional[str] = None  # Archivo de origen
 
