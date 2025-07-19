@@ -52,13 +52,14 @@ class ExcelParser:
         """Normaliza los nombres de las columnas del DataFrame"""
         # Mapeo de nombres de columnas comunes
         mapeo_columnas = {
-            'codigo': ['código', 'code', 'id', 'producto_id', 'cod', 'ref'],
+            'codigo': ['código', 'code', 'id', 'producto_id', 'cod', 'ref', 'modelo'],
             'nombre': ['descripción', 'descripcion', 'producto', 'name', 'desc', 'descrip', 'item'],
             'capacidad': ['ah', 'amperaje', 'capacidad_ah', 'cap', 'amperes'],
             'marca': ['brand', 'fabricante', 'marca', 'make'],
-            'canal': ['tipo', 'tipo_canal', 'categoria', 'channel', 'tipo_venta'],
-            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost'],
-            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico']
+            'categoria': ['tipo', 'tipo_canal', 'categoria', 'category', 'channel', 'tipo_venta', 'rubro', 'subrubro'],
+            'precio_base': ['precio', 'precio_base', 'costo', 'precio_costo', 'base', 'cost', 'precio_lista', 'precio lista'],
+            'precio_final': ['precio_final', 'precio_venta', 'precio_publico', 'final', 'venta', 'publico', 'pvp', 'pvp on line', 'pvp online'],
+            'stock': ['stock', 'cantidad', 'quantity', 'disponible', 'inventario', 'q_pallet', 'q. pallet', 'inner', 'master']
         }
         
         # Normalizar nombres de columnas
@@ -72,21 +73,24 @@ class ExcelParser:
         # También buscar coincidencias parciales
         for col in df.columns:
             col_lower = col.lower()
-            if 'codigo' in col_lower or 'code' in col_lower or 'id' in col_lower:
+            if 'codigo' in col_lower or 'code' in col_lower or 'id' in col_lower or 'modelo' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'codigo'
             elif 'nombre' in col_lower or 'name' in col_lower or 'desc' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'nombre'
-            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower:
+            elif 'precio' in col_lower or 'price' in col_lower or 'costo' in col_lower or 'pvp' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'precio_base'
             elif 'marca' in col_lower or 'brand' in col_lower:
                 if col not in columnas_normalizadas:
                     columnas_normalizadas[col] = 'marca'
-            elif 'canal' in col_lower or 'channel' in col_lower or 'tipo' in col_lower:
+            elif 'categoria' in col_lower or 'category' in col_lower or 'tipo' in col_lower or 'rubro' in col_lower:
                 if col not in columnas_normalizadas:
-                    columnas_normalizadas[col] = 'canal'
+                    columnas_normalizadas[col] = 'categoria'
+            elif 'stock' in col_lower or 'cantidad' in col_lower or 'q.' in col_lower or 'inner' in col_lower or 'master' in col_lower:
+                if col not in columnas_normalizadas:
+                    columnas_normalizadas[col] = 'stock'
         
         # Renombrar columnas
         df = df.rename(columns=columnas_normalizadas)
@@ -144,7 +148,7 @@ class ExcelParser:
             # Determinar marca
             marca = self.determinar_marca(row, codigo)
             
-            # Determinar canal
+            # Determinar canal (usar categoría si está disponible)
             canal = self.determinar_canal(row)
             
             # Extraer precios
@@ -237,10 +241,18 @@ class ExcelParser:
 
     def determinar_canal(self, row: pd.Series) -> Canal:
         """Determina el canal del producto"""
+        # Buscar en columna canal
         if 'canal' in row and pd.notna(row['canal']):
             canal_str = str(row['canal']).lower().strip()
             for clave, canal in self.mapeo_canales.items():
                 if clave in canal_str:
+                    return canal
+        
+        # Buscar en columna categoria
+        if 'categoria' in row and pd.notna(row['categoria']):
+            categoria_str = str(row['categoria']).lower().strip()
+            for clave, canal in self.mapeo_canales.items():
+                if clave in categoria_str:
                     return canal
         
         # Por defecto, minorista
@@ -249,22 +261,50 @@ class ExcelParser:
     def extraer_precio_base(self, row: pd.Series) -> float:
         """Extrae el precio base del producto"""
         if 'precio_base' in row and pd.notna(row['precio_base']):
-            return float(row['precio_base'])
+            precio_str = str(row['precio_base'])
+            
+            # Manejar casos especiales como "LIBERADO"
+            if 'liberado' in precio_str.lower():
+                return 0.0
+            
+            # Limpiar y convertir precio
+            precio_limpio = re.sub(r'[^\d.,]', '', precio_str)
+            if precio_limpio:
+                try:
+                    # Manejar diferentes separadores decimales
+                    precio_limpio = precio_limpio.replace(',', '.')
+                    return float(precio_limpio)
+                except ValueError:
+                    pass
         
         # Si no hay precio base, usar precio final como base
         if 'precio_final' in row and pd.notna(row['precio_final']):
-            return float(row['precio_final'])
+            return self.extraer_precio_final(row)
         
         return 0.0
 
     def extraer_precio_final(self, row: pd.Series) -> float:
         """Extrae el precio final del producto"""
         if 'precio_final' in row and pd.notna(row['precio_final']):
-            return float(row['precio_final'])
+            precio_str = str(row['precio_final'])
+            
+            # Manejar casos especiales como "LIBERADO"
+            if 'liberado' in precio_str.lower():
+                return 0.0
+            
+            # Limpiar y convertir precio
+            precio_limpio = re.sub(r'[^\d.,]', '', precio_str)
+            if precio_limpio:
+                try:
+                    # Manejar diferentes separadores decimales
+                    precio_limpio = precio_limpio.replace(',', '.')
+                    return float(precio_limpio)
+                except ValueError:
+                    pass
         
         # Si no hay precio final, usar precio base
         if 'precio_base' in row and pd.notna(row['precio_base']):
-            return float(row['precio_base'])
+            return self.extraer_precio_base(row)
         
         return 0.0
 
