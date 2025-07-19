@@ -2,6 +2,8 @@ from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import logging
+import io
+import pandas as pd
 
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
@@ -48,16 +50,39 @@ async def upload_file(file: UploadFile = File(...)):
         if not file.filename.endswith(('.xlsx', '.xls')):
             raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls)")
         
-        # Por ahora, solo confirmar que se recibió el archivo
+        # Leer el archivo
         contenido = file.file.read()
         
         if not contenido:
             raise HTTPException(status_code=400, detail="El archivo está vacío")
         
+        # Crear buffer en memoria
+        buffer = io.BytesIO(contenido)
+        
+        # Leer Excel
+        try:
+            df = pd.read_excel(buffer, engine='openpyxl')
+        except:
+            buffer.seek(0)
+            df = pd.read_excel(buffer, engine='xlrd')
+        
+        # Verificar que tenga datos
+        if df.empty:
+            raise HTTPException(status_code=400, detail="El archivo Excel está vacío")
+        
+        # Procesamiento básico
+        productos_procesados = len(df)
+        productos_con_alertas = 0
+        
+        # Actualizar productos globales (simplificado)
+        global productos_actuales
+        productos_actuales = [{"codigo": f"PROD_{i}", "nombre": str(row.iloc[0]) if len(row) > 0 else "Sin nombre"} 
+                             for i, row in df.iterrows()]
+        
         return {
-            "mensaje": "Archivo recibido correctamente (procesamiento temporalmente deshabilitado)",
-            "tamaño_archivo": len(contenido),
-            "nombre_archivo": file.filename
+            "mensaje": "Archivo procesado exitosamente",
+            "productos_procesados": productos_procesados,
+            "productos_con_alertas": productos_con_alertas
         }
         
     except HTTPException:
