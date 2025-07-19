@@ -260,72 +260,43 @@ async def get_status():
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """Endpoint para subir archivo Excel y procesar con pricing"""
+    """Endpoint para subir archivo de productos"""
     try:
         if not MODULES_AVAILABLE:
             raise HTTPException(status_code=503, detail="Sistema en modo básico. Módulos de procesamiento no disponibles.")
         
-        # Verificar que sea un archivo soportado
+        # Verificar tipo de archivo
         if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) o CSV (.csv)")
-        
-        # Leer el archivo
-        contenido = file.file.read()
-        
-        if not contenido:
-            raise HTTPException(status_code=400, detail="El archivo está vacío")
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) o CSV")
         
         # Guardar archivo temporalmente
         import tempfile
+        import os
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            contenido = file.file.read()
             temp_file.write(contenido)
             temp_file_path = temp_file.name
         
         try:
-            # Procesar archivo Excel/CSV
-            productos = excel_parser.leer_excel(temp_file_path)
+            # Usar el nuevo sistema de detección y parsing
+            productos_data = excel_parser.detect_and_parse_file(temp_file_path)
             
-            if not productos:
-                raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
+            if not productos_data:
+                raise HTTPException(status_code=400, detail="No se pudieron extraer productos del archivo")
             
-            # Aplicar pricing logic con validación de rentabilidad
-            productos_procesados = pricing_logic.procesar_productos(productos)
+            # Procesar productos con pricing y rentabilidad
+            productos_procesados = pricing_logic.procesar_productos_con_rentabilidad(productos_data)
             
-            # Analizar con OpenAI si está disponible
-            if openai_helper.esta_disponible():
-                productos_analizados = openai_helper.analizar_lote_productos(productos_procesados)
-                productos_procesados = productos_analizados
-            
-            # Actualizar productos globales
+            # Guardar productos en memoria
             global productos_actuales
             productos_actuales = productos_procesados
             
-            # Generar resúmenes
-            resumen_marcas = pricing_logic.obtener_resumen_marcas(productos_procesados)
-            resumen_canales = pricing_logic.obtener_resumen_canales(productos_procesados)
-            
-            productos_con_alertas = len([p for p in productos_procesados if p.alertas])
-            
-            # Estadísticas de rentabilidad
-            rentabilidad_ok = len([p for p in productos_procesados if p.estado_rentabilidad == 'OK'])
-            rentabilidad_revisar = len([p for p in productos_procesados if p.estado_rentabilidad == 'Revisar'])
-            rentabilidad_ajustar = len([p for p in productos_procesados if p.estado_rentabilidad == 'Ajustar'])
-            
             return {
-                "mensaje": "Archivo procesado exitosamente con pricing, rentabilidad e IA",
-                "productos_procesados": len(productos_procesados),
-                "productos_con_alertas": productos_con_alertas,
-                "rentabilidad": {
-                    "ok": rentabilidad_ok,
-                    "revisar": rentabilidad_revisar,
-                    "ajustar": rentabilidad_ajustar
-                },
-                "resumen_marcas": resumen_marcas,
-                "resumen_canales": resumen_canales,
-                "openai_utilizado": openai_helper.esta_disponible(),
-                "rentabilidad_cargada": pricing_logic.rentabilidad_validator.archivo_cargado,
-                "archivo_original": file.filename
+                "mensaje": f"✅ Archivo procesado exitosamente. {len(productos_procesados)} productos cargados.",
+                "productos": len(productos_procesados),
+                "archivo": file.filename,
+                "tipo_detectado": "MOURA" if excel_parser.is_moura_file(temp_file_path) else "Genérico"
             }
             
         finally:

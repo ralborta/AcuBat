@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict
 from .models import Producto, Canal, Marca
 import logging
 
@@ -410,3 +410,56 @@ class ExcelParser:
         except Exception as e:
             logger.error(f"Error creando archivo de ejemplo: {e}")
             return None 
+
+# Importar el parser específico de MOURA
+try:
+    from .moura_parser import parse_moura_file
+    MOURA_PARSER_AVAILABLE = True
+except ImportError:
+    MOURA_PARSER_AVAILABLE = False
+    logger.warning("Parser específico de MOURA no disponible")
+
+def detect_and_parse_file(file_path: str) -> List[Dict]:
+    """
+    Detecta el tipo de archivo y usa el parser apropiado
+    """
+    try:
+        # Verificar si es un archivo MOURA
+        if is_moura_file(file_path):
+            logger.info("Archivo MOURA detectado, usando parser específico")
+            if MOURA_PARSER_AVAILABLE:
+                return parse_moura_file(file_path)
+            else:
+                logger.warning("Parser MOURA no disponible, usando parser genérico")
+        
+        # Usar parser genérico para otros archivos
+        return parse_excel_file(file_path)
+        
+    except Exception as e:
+        logger.error(f"Error en detección y parsing: {str(e)}")
+        raise
+
+def is_moura_file(file_path: str) -> bool:
+    """
+    Detecta si es un archivo MOURA basado en contenido
+    """
+    try:
+        excel_file = pd.ExcelFile(file_path)
+        
+        # Verificar si alguna hoja contiene códigos MOURA
+        for sheet_name in excel_file.sheet_names:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
+            
+            # Buscar códigos que empiecen con M (MOURA)
+            for idx, row in df.iterrows():
+                if pd.notna(row.iloc[0]) and isinstance(row.iloc[0], str):
+                    codigo = str(row.iloc[0]).strip()
+                    if re.match(r'^M[A-Z0-9]+$', codigo):
+                        logger.info(f"Archivo MOURA detectado por código: {codigo}")
+                        return True
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error al detectar archivo MOURA: {str(e)}")
+        return False 
