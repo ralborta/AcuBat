@@ -148,6 +148,10 @@
                         <i class="fas fa-download"></i> Exportar CSV
                     </button>
                     
+                    <button class="btn btn-warning w-100 mb-2" onclick="cargarRentabilidades()">
+                        <i class="fas fa-chart-line"></i> Cargar Rentabilidades
+                    </button>
+                    
                     {% if openai_disponible %}
                     <button class="btn btn-info w-100 mb-2" onclick="analizarConIA()">
                         <i class="fas fa-brain"></i> Analizar con IA
@@ -224,6 +228,7 @@
                                     <th>Precio Final</th>
                                     <th>Margen</th>
                                     <th>Estado</th>
+                                    <th>Rentabilidad</th>
                                     <th>IA</th>
                                 </tr>
                             </thead>
@@ -247,6 +252,25 @@
                                         {% else %}
                                         <span class="badge bg-success alert-badge">
                                             <i class="fas fa-check"></i> OK
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if producto.estado_rentabilidad == 'OK' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle"></i> OK
+                                        </span>
+                                        {% elif producto.estado_rentabilidad == 'Revisar' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-exclamation-circle"></i> Revisar
+                                        </span>
+                                        {% elif producto.estado_rentabilidad == 'Ajustar' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times-circle"></i> Ajustar
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-question-circle"></i> Sin ref.
                                         </span>
                                         {% endif %}
                                     </td>
@@ -406,6 +430,31 @@
 
         function exportarCSV() {
             window.location.href = '/export/csv';
+        }
+
+        function cargarRentabilidades() {
+            mostrarCarga('Cargando rentabilidades...');
+            actualizarProgreso(10, 'Iniciando carga...');
+            
+            fetch('/cargar-rentabilidades')
+            .then(response => response.json())
+            .then(data => {
+                actualizarProgreso(100, 'Rentabilidades cargadas');
+                setTimeout(() => {
+                    if (data.mensaje) {
+                        mostrarAlerta('success', '✅ ' + data.mensaje);
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        mostrarAlerta('danger', '❌ Error al cargar rentabilidades: ' + (data.detail || 'Error desconocido'));
+                        ocultarCarga();
+                    }
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarAlerta('danger', '❌ Error al cargar rentabilidades');
+                ocultarCarga();
+            });
         }
 
         function mostrarSugerencia(sugerencia) {

@@ -289,7 +289,7 @@ async def upload_file(file: UploadFile = File(...)):
             if not productos:
                 raise HTTPException(status_code=400, detail="No se pudieron procesar productos del archivo")
             
-            # Aplicar pricing logic
+            # Aplicar pricing logic con validación de rentabilidad
             productos_procesados = pricing_logic.procesar_productos(productos)
             
             # Analizar con OpenAI si está disponible
@@ -307,13 +307,24 @@ async def upload_file(file: UploadFile = File(...)):
             
             productos_con_alertas = len([p for p in productos_procesados if p.alertas])
             
+            # Estadísticas de rentabilidad
+            rentabilidad_ok = len([p for p in productos_procesados if p.estado_rentabilidad == 'OK'])
+            rentabilidad_revisar = len([p for p in productos_procesados if p.estado_rentabilidad == 'Revisar'])
+            rentabilidad_ajustar = len([p for p in productos_procesados if p.estado_rentabilidad == 'Ajustar'])
+            
             return {
-                "mensaje": "Archivo procesado exitosamente con pricing e IA",
+                "mensaje": "Archivo procesado exitosamente con pricing, rentabilidad e IA",
                 "productos_procesados": len(productos_procesados),
                 "productos_con_alertas": productos_con_alertas,
+                "rentabilidad": {
+                    "ok": rentabilidad_ok,
+                    "revisar": rentabilidad_revisar,
+                    "ajustar": rentabilidad_ajustar
+                },
                 "resumen_marcas": resumen_marcas,
                 "resumen_canales": resumen_canales,
                 "openai_utilizado": openai_helper.esta_disponible(),
+                "rentabilidad_cargada": pricing_logic.rentabilidad_validator.archivo_cargado,
                 "archivo_original": file.filename
             }
             
@@ -327,6 +338,77 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error al procesar archivo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
+
+@app.post("/upload-rentabilidades")
+async def upload_rentabilidades(file: UploadFile = File(...)):
+    """Endpoint para subir archivo de rentabilidades"""
+    try:
+        if not MODULES_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Sistema en modo básico. Módulos de procesamiento no disponibles.")
+        
+        # Verificar que sea un archivo Excel
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls) para rentabilidades")
+        
+        # Leer el archivo
+        contenido = file.file.read()
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        
+        # Guardar archivo temporalmente
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Cargar rentabilidades
+            rentabilidad_cargada = pricing_logic.cargar_rentabilidades(temp_file_path)
+            
+            if not rentabilidad_cargada:
+                raise HTTPException(status_code=400, detail="No se pudo cargar el archivo de rentabilidades")
+            
+            # Obtener resumen de rentabilidades
+            resumen_rentabilidad = pricing_logic.rentabilidad_validator.obtener_resumen_rentabilidad()
+            
+            return {
+                "mensaje": "Archivo de rentabilidades cargado exitosamente",
+                "reglas_cargadas": resumen_rentabilidad.get('total_reglas', 0),
+                "resumen_rentabilidad": resumen_rentabilidad,
+                "archivo_original": file.filename
+            }
+            
+        finally:
+            # Limpiar archivo temporal
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al cargar rentabilidades: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al cargar rentabilidades: {str(e)}")
+
+@app.get("/api/estado-rentabilidad")
+async def obtener_estado_rentabilidad():
+    """Obtiene el estado de las rentabilidades cargadas"""
+    try:
+        if not MODULES_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Módulo de rentabilidad no disponible")
+        
+        archivo_cargado = pricing_logic.rentabilidad_validator.archivo_cargado
+        resumen = pricing_logic.rentabilidad_validator.obtener_resumen_rentabilidad()
+        
+        return {
+            "archivo_cargado": archivo_cargado,
+            "total_reglas": resumen.get('total_reglas', 0),
+            "resumen": resumen
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo estado de rentabilidad: {e}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo estado: {str(e)}")
 
 @app.get("/export/csv")
 async def export_csv():

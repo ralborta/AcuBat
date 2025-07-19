@@ -36,6 +36,9 @@ class Producto(BaseModel):
     alertas: List[TipoAlerta] = []
     sugerencias_ai: Optional[str] = None
     sugerencias_openai: Optional[str] = None  # Campo para compatibilidad
+    estado_rentabilidad: str = "Sin referencia"  # OK, Revisar, Ajustar, Sin referencia
+    margen_minimo_esperado: float = 0.0
+    margen_optimo_esperado: float = 0.0
     fecha_procesamiento: datetime = datetime.now()
     origen_archivo: Optional[str] = None  # Archivo de origen
 
