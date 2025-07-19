@@ -265,78 +265,32 @@ async def upload_file(file: UploadFile = File(...)):
         logger.info(f"=== INICIO UPLOAD ===")
         logger.info(f"Archivo recibido: {file.filename}")
         logger.info(f"Content-Type: {file.content_type}")
-        logger.info(f"Tamaño: {file.size if hasattr(file, 'size') else 'N/A'}")
         
-        if not MODULES_AVAILABLE:
-            logger.error("Módulos no disponibles")
-            raise HTTPException(status_code=503, detail="Sistema en modo básico. Módulos de procesamiento no disponibles.")
+        # Verificación básica
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No se proporcionó nombre de archivo")
         
-        # Verificar tipo de archivo
         if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-            logger.error(f"Tipo de archivo no soportado: {file.filename}")
-            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten Excel (.xlsx, .xls) o CSV (.csv)")
+            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}")
         
         # Leer contenido del archivo
         contenido = file.file.read()
         logger.info(f"Contenido leído: {len(contenido)} bytes")
         
         if not contenido:
-            logger.error("Archivo vacío")
             raise HTTPException(status_code=400, detail="El archivo está vacío")
         
-        logger.info(f"Procesando archivo: {file.filename} ({len(contenido)} bytes)")
+        # Por ahora, solo devolver información básica
+        logger.info(f"=== UPLOAD BÁSICO EXITOSO ===")
         
-        # Guardar archivo temporalmente
-        import tempfile
-        import os
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            temp_file.write(contenido)
-            temp_file_path = temp_file.name
-        
-        logger.info(f"Archivo temporal creado: {temp_file_path}")
-        
-        try:
-            # Verificar si es archivo MOURA
-            es_moura = is_moura_file(temp_file_path)
-            logger.info(f"Archivo detectado como MOURA: {es_moura}")
-            
-            # Usar el nuevo sistema de detección y parsing
-            logger.info("Iniciando detección y parsing...")
-            productos_data = detect_and_parse_file(temp_file_path)
-            
-            if not productos_data:
-                logger.error("No se pudieron extraer productos")
-                raise HTTPException(status_code=400, detail="No se pudieron extraer productos del archivo. Verifica que el archivo contenga datos válidos.")
-            
-            logger.info(f"Productos extraídos: {len(productos_data)}")
-            
-            # Procesar productos con pricing y rentabilidad
-            logger.info("Procesando productos con pricing...")
-            productos_procesados = pricing_logic.procesar_productos_con_rentabilidad(productos_data)
-            
-            # Guardar productos en memoria
-            global productos_actuales
-            productos_actuales = productos_procesados
-            
-            logger.info(f"=== UPLOAD EXITOSO: {len(productos_procesados)} productos ===")
-            
-            return {
-                "mensaje": f"✅ Archivo procesado exitosamente. {len(productos_procesados)} productos cargados.",
-                "productos": len(productos_procesados),
-                "archivo": file.filename,
-                "tipo_detectado": "MOURA" if es_moura else "Genérico",
-                "tamaño_archivo": len(contenido)
-            }
-            
-        finally:
-            # Limpiar archivo temporal
-            if os.path.exists(temp_file_path):
-                os.unlink(temp_file_path)
-                logger.info(f"Archivo temporal eliminado: {temp_file_path}")
+        return {
+            "mensaje": f"✅ Archivo recibido correctamente: {file.filename} ({len(contenido)} bytes)",
+            "archivo": file.filename,
+            "tamaño": len(contenido),
+            "tipo": file.content_type
+        }
         
     except HTTPException:
-        logger.error("HTTPException en upload")
         raise
     except Exception as e:
         logger.error(f"Error inesperado en upload: {str(e)}")
