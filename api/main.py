@@ -898,17 +898,115 @@ async def calcular_precios_con_rentabilidad():
         if len(rentabilidad_hoja) > 0:
             logger.info(f"Columnas en rentabilidad: {list(rentabilidad_hoja[0].keys())}")
         
-        # Por ahora solo devolver información básica
+        # IMPLEMENTAR LÓGICA DE CÁLCULO
+        productos_calculados = []
+        alertas_generadas = 0
+        
+        for producto in precios_hoja:
+            try:
+                # Buscar regla de rentabilidad correspondiente
+                regla_encontrada = None
+                
+                # Intentar diferentes combinaciones de columnas para matching
+                posibles_columnas_producto = ['producto', 'codigo', 'nombre', 'descripcion', 'linea', 'marca']
+                posibles_columnas_rentabilidad = ['producto', 'codigo', 'nombre', 'descripcion', 'linea', 'marca', 'canal']
+                
+                for col_prod in posibles_columnas_producto:
+                    if col_prod in producto:
+                        valor_producto = str(producto[col_prod]).lower().strip()
+                        
+                        for regla in rentabilidad_hoja:
+                            for col_rent in posibles_columnas_rentabilidad:
+                                if col_rent in regla:
+                                    valor_regla = str(regla[col_rent]).lower().strip()
+                                    
+                                    if valor_producto == valor_regla:
+                                        regla_encontrada = regla
+                                        break
+                            if regla_encontrada:
+                                break
+                        if regla_encontrada:
+                            break
+                    if regla_encontrada:
+                        break
+                
+                # Si no se encuentra regla específica, usar regla por defecto
+                if not regla_encontrada and len(rentabilidad_hoja) > 0:
+                    regla_encontrada = rentabilidad_hoja[0]  # Usar primera regla como default
+                
+                # Calcular precio con margen
+                precio_base = float(producto.get('precio', 0))
+                margen_minimo = float(regla_encontrada.get('margen_minimo', 20)) if regla_encontrada else 20
+                margen_optimo = float(regla_encontrada.get('margen_optimo', 35)) if regla_encontrada else 35
+                
+                # Aplicar margen óptimo
+                precio_final = precio_base * (1 + margen_optimo / 100)
+                
+                # Calcular margen real
+                margen_real = ((precio_final - precio_base) / precio_base) * 100
+                
+                # Generar alertas
+                alertas = []
+                if margen_real < margen_minimo:
+                    alertas.append(f"Margen bajo: {margen_real:.1f}% < {margen_minimo}%")
+                    alertas_generadas += 1
+                
+                # Crear producto calculado
+                producto_calculado = {
+                    'codigo': producto.get('codigo', producto.get('producto', 'N/A')),
+                    'nombre': producto.get('nombre', producto.get('descripcion', 'N/A')),
+                    'marca': producto.get('marca', 'N/A'),
+                    'canal': producto.get('canal', 'N/A'),
+                    'linea': producto.get('linea', 'N/A'),
+                    'precio_base': precio_base,
+                    'precio_final': round(precio_final, 2),
+                    'margen_aplicado': margen_optimo,
+                    'margen_real': round(margen_real, 1),
+                    'margen_minimo': margen_minimo,
+                    'regla_usada': regla_encontrada.get('descripcion', 'Default') if regla_encontrada else 'Default',
+                    'alertas': alertas,
+                    'estado': 'OK' if not alertas else 'Revisar'
+                }
+                
+                productos_calculados.append(producto_calculado)
+                
+            except Exception as e:
+                logger.error(f"Error procesando producto {producto.get('codigo', 'N/A')}: {str(e)}")
+                # Agregar producto con error
+                productos_calculados.append({
+                    'codigo': producto.get('codigo', producto.get('producto', 'N/A')),
+                    'nombre': producto.get('nombre', producto.get('descripcion', 'N/A')),
+                    'precio_base': 0,
+                    'precio_final': 0,
+                    'margen_real': 0,
+                    'alertas': [f"Error en procesamiento: {str(e)}"],
+                    'estado': 'Error'
+                })
+        
+        # Guardar resultados globalmente
+        global productos_actuales
+        productos_actuales = productos_calculados
+        
+        # Calcular estadísticas
+        productos_ok = len([p for p in productos_calculados if p['estado'] == 'OK'])
+        productos_revisar = len([p for p in productos_calculados if p['estado'] == 'Revisar'])
+        productos_error = len([p for p in productos_calculados if p['estado'] == 'Error'])
+        
         return {
             "status": "success",
-            "mensaje": f"Archivos listos para procesamiento",
+            "mensaje": f"✅ Cálculo completado: {len(productos_calculados)} productos procesados",
             "precios_hoja": hoja_precios,
             "rentabilidad_hoja": hoja_rentabilidad,
-            "total_productos": len(precios_hoja),
+            "total_productos": len(productos_calculados),
             "total_reglas": len(rentabilidad_hoja),
-            "hojas_disponibles_precios": hojas_precios,
-            "hojas_disponibles_rentabilidad": hojas_rentabilidad,
-            "proximo_paso": "Implementar cálculo de precios con margen"
+            "estadisticas": {
+                "productos_ok": productos_ok,
+                "productos_revisar": productos_revisar,
+                "productos_error": productos_error,
+                "alertas_generadas": alertas_generadas
+            },
+            "productos": productos_calculados[:10],  # Primeros 10 para preview
+            "proximo_paso": "Resultados disponibles para revisión"
         }
         
     except Exception as e:

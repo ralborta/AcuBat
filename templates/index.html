@@ -556,28 +556,89 @@
             const resultsSection = document.getElementById('resultsSection');
             const resultsContent = document.getElementById('resultsContent');
             
-            resultsContent.innerHTML = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-file-excel"></i> Archivos Procesados</h6>
-                        <ul class="list-unstyled">
-                            <li><strong>Precios:</strong> ${data.precios_hoja}</li>
-                            <li><strong>Rentabilidad:</strong> ${data.rentabilidad_hoja}</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-chart-bar"></i> Estadísticas</h6>
-                        <ul class="list-unstyled">
-                            <li><strong>Productos:</strong> ${data.total_productos}</li>
-                            <li><strong>Reglas:</strong> ${data.total_reglas}</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <p class="text-muted"><i class="fas fa-info-circle"></i> ${data.proximo_paso}</p>
-                </div>
-            `;
+            let html = '<h4><i class="fas fa-chart-bar"></i> Resultados del Cálculo</h4>';
             
+            // Estadísticas generales
+            html += '<div class="row mb-4">';
+            html += '<div class="col-md-6">';
+            html += '<div class="card">';
+            html += '<div class="card-header">📊 Archivos Procesados</div>';
+            html += '<div class="card-body">';
+            html += `<p><strong>Precios:</strong> ${data.precios_hoja}</p>`;
+            html += `<p><strong>Rentabilidad:</strong> ${data.rentabilidad_hoja}</p>`;
+            html += '</div></div></div>';
+            
+            html += '<div class="col-md-6">';
+            html += '<div class="card">';
+            html += '<div class="card-header">📈 Estadísticas</div>';
+            html += '<div class="card-body">';
+            html += `<p><strong>Productos:</strong> ${data.total_productos}</p>`;
+            html += `<p><strong>Reglas:</strong> ${data.total_reglas}</p>`;
+            if (data.estadisticas) {
+                html += `<p><strong>✅ OK:</strong> ${data.estadisticas.productos_ok}</p>`;
+                html += `<p><strong>⚠️ Revisar:</strong> ${data.estadisticas.productos_revisar}</p>`;
+                html += `<p><strong>❌ Error:</strong> ${data.estadisticas.productos_error}</p>`;
+                html += `<p><strong>🚨 Alertas:</strong> ${data.estadisticas.alertas_generadas}</p>`;
+            }
+            html += '</div></div></div>';
+            html += '</div>';
+            
+            // Tabla de productos
+            if (data.productos && data.productos.length > 0) {
+                html += '<div class="card">';
+                html += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-striped table-hover">';
+                html += '<thead class="table-dark">';
+                html += '<tr>';
+                html += '<th>Código</th>';
+                html += '<th>Nombre</th>';
+                html += '<th>Precio Base</th>';
+                html += '<th>Precio Final</th>';
+                html += '<th>Margen</th>';
+                html += '<th>Estado</th>';
+                html += '<th>Alertas</th>';
+                html += '</tr>';
+                html += '</thead>';
+                html += '<tbody>';
+                
+                data.productos.forEach(producto => {
+                    const estadoClass = producto.estado === 'OK' ? 'success' : 
+                                      producto.estado === 'Revisar' ? 'warning' : 'danger';
+                    const estadoIcon = producto.estado === 'OK' ? 'check-circle' : 
+                                     producto.estado === 'Revisar' ? 'exclamation-triangle' : 'times-circle';
+                    
+                    html += '<tr>';
+                    html += `<td><strong>${producto.codigo}</strong></td>`;
+                    html += `<td>${producto.nombre}</td>`;
+                    html += `<td>$${producto.precio_base.toFixed(2)}</td>`;
+                    html += `<td>$${producto.precio_final.toFixed(2)}</td>`;
+                    html += `<td>${producto.margen_real}%</td>`;
+                    html += `<td><span class="badge bg-${estadoClass}"><i class="fas fa-${estadoIcon}"></i> ${producto.estado}</span></td>`;
+                    html += `<td>${producto.alertas && producto.alertas.length > 0 ? producto.alertas.join(', ') : '-'}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
+                html += '</div></div>';
+            }
+            
+            // Botones de acción
+            html += '<div class="mt-3">';
+            html += '<div class="d-flex gap-2">';
+            html += '<button class="btn btn-modern btn-primary-modern" onclick="exportarResultados()">';
+            html += '<i class="fas fa-download"></i> Exportar CSV';
+            html += '</button>';
+            html += '<button class="btn btn-modern btn-warning-modern" onclick="verTodosLosProductos()">';
+            html += '<i class="fas fa-list"></i> Ver Todos';
+            html += '</button>';
+            html += '</div>';
+            html += '</div>';
+            
+            resultsContent.innerHTML = html;
             resultsSection.style.display = 'block';
         }
 
@@ -677,6 +738,16 @@
             
             resultsContent.innerHTML = html;
             resultsSection.style.display = 'block';
+        }
+
+        function verTodosLosProductos() {
+            // Redirigir a la página principal que muestra todos los productos
+            window.location.href = '/';
+        }
+
+        function exportarResultados() {
+            // Descargar CSV de resultados
+            window.location.href = '/export/csv';
         }
     </script>
 </body>
