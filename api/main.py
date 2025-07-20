@@ -213,7 +213,7 @@ async def index(request: Request):
             "request": request,
             "productos": productos_actuales if productos_actuales else [],
             "total_productos": len(productos_actuales) if productos_actuales else 0,
-            "productos_con_alertas": len([p for p in productos_actuales if p.alertas]) if productos_actuales else 0,
+            "productos_con_alertas": len([p for p in productos_actuales if p.get('alertas')]) if productos_actuales else 0,
             "openai_disponible": openai_helper.esta_disponible() if MODULES_AVAILABLE else False,
             "resumen_marcas": resumen_marcas,
             "resumen_canales": resumen_canales,
@@ -824,13 +824,13 @@ async def filtrar_productos(
             productos_filtrados = [p for p in productos_filtrados if p.canal == canal]
         
         if marca:
-            productos_filtrados = [p for p in productos_filtrados if p.marca == marca]
+            productos_filtrados = [p for p in productos_filtrados if p.get('marca') == marca]
         
         if con_alertas is not None:
             if con_alertas:
-                productos_filtrados = [p for p in productos_filtrados if p.alertas]
+                productos_filtrados = [p for p in productos_filtrados if p.get('alertas')]
             else:
-                productos_filtrados = [p for p in productos_filtrados if not p.alertas]
+                productos_filtrados = [p for p in productos_filtrados if not p.get('alertas')]
         
         return {
             "productos": productos_filtrados,
@@ -878,7 +878,7 @@ async def obtener_sugerencias_precio(codigo_producto: str):
             raise HTTPException(status_code=503, detail="Módulo de sugerencias no disponible")
         
         # Buscar producto por código
-        producto = next((p for p in productos_actuales if p.codigo == codigo_producto), None)
+        producto = next((p for p in productos_actuales if p.get('codigo') == codigo_producto), None)
         
         if not producto:
             raise HTTPException(status_code=404, detail=f"Producto {codigo_producto} no encontrado")
@@ -888,10 +888,10 @@ async def obtener_sugerencias_precio(codigo_producto: str):
         
         return {
             "producto": {
-                "codigo": producto.codigo,
-                "nombre": producto.nombre,
-                "precio_actual": producto.precio_final,
-                "margen_actual": producto.margen
+                "codigo": producto.get('codigo'),
+                "nombre": producto.get('nombre'),
+                "precio_actual": producto.get('precio_final'),
+                "margen_actual": producto.get('margen')
             },
             "sugerencias": sugerencias
         }
