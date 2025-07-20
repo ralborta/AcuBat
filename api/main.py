@@ -1002,6 +1002,8 @@ async def calcular_precios_con_rentabilidad():
         
         logger.info(f"Productos en precios: {len(precios_hoja)}")
         logger.info(f"Reglas en rentabilidad: {len(rentabilidad_hoja)}")
+        logger.info(f"Primer producto: {precios_hoja[0] if precios_hoja else 'No hay productos'}")
+        logger.info(f"Primera regla: {rentabilidad_hoja[0] if rentabilidad_hoja else 'No hay reglas'}")
         
         # Convertir datos a productos
         productos = []
@@ -1030,6 +1032,7 @@ async def calcular_precios_con_rentabilidad():
         
         # Procesar productos directamente con los datos en memoria
         logger.info("🔄 Procesando productos con datos en memoria...")
+        logger.info(f"Total productos a procesar: {len(productos)}")
         
         productos_procesados = []
         pasos_completados = []
@@ -1041,8 +1044,8 @@ async def calcular_precios_con_rentabilidad():
                 
                 # Buscar por código de producto
                 for regla in rentabilidad_hoja:
-                    if 'codigo' in regla and 'codigo' in producto:
-                        if str(regla['codigo']).strip() == str(producto['codigo']).strip():
+                    if 'codigo' in regla:
+                        if str(regla['codigo']).strip() == str(producto.codigo).strip():
                             regla_encontrada = regla
                             break
                 
@@ -1100,6 +1103,7 @@ async def calcular_precios_con_rentabilidad():
         ]
         
         logger.info(f"✅ Proceso completado exitosamente - {len(productos_procesados)} productos")
+        logger.info(f"📊 Resumen: {len(productos_procesados)} productos procesados de {len(productos)} originales")
         
         return {
             "status": "success",
