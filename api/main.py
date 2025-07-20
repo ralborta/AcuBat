@@ -311,15 +311,15 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/cargar-rentabilidades")
 async def upload_rentabilidades(file: UploadFile = File(...)):
-    """Endpoint para subir archivo de rentabilidades"""
+    """Endpoint para subir archivo de precios/rentabilidades"""
     try:
-        logger.info(f"=== INICIO CARGAR RENTABILIDADES ===")
+        logger.info(f"=== INICIO CARGAR ARCHIVO DE PRECIOS ===")
         logger.info(f"Archivo recibido: {file.filename}")
         logger.info(f"Content-Type: {file.content_type}")
         
         # Verificar que sea un archivo Excel
         if not file.filename.endswith(('.xlsx', '.xls')):
-            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten archivos Excel (.xlsx, .xls) para rentabilidades")
+            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten archivos Excel (.xlsx, .xls)")
         
         # Leer el archivo
         contenido = file.file.read()
@@ -367,44 +367,61 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             logger.info(f"Primeras 3 filas de '{hoja_moura}':")
             logger.info(df.head(3).to_string())
             
-            # Verificar si tiene las columnas requeridas
-            columnas_requeridas = ['canal', 'línea', 'margen mínimo', 'margen óptimo']
+            # Verificar si tiene las columnas requeridas para archivo de precios
+            columnas_requeridas_precios = ['rentabilidad', 'mark-up', 'markup']
             columnas_encontradas = []
             columnas_faltantes = []
             
             for col in df.columns:
                 col_lower = str(col).lower().strip()
-                if any(req in col_lower for req in ['canal', 'channel']):
-                    columnas_encontradas.append('canal')
-                elif any(req in col_lower for req in ['línea', 'linea', 'line']):
-                    columnas_encontradas.append('línea')
-                elif any(req in col_lower for req in ['margen mínimo', 'margen_minimo', 'minimo']):
-                    columnas_encontradas.append('margen mínimo')
-                elif any(req in col_lower for req in ['margen óptimo', 'margen_optimo', 'optimo']):
-                    columnas_encontradas.append('margen óptimo')
+                if any(req in col_lower for req in ['rentabilidad', 'rent']):
+                    columnas_encontradas.append('rentabilidad')
+                elif any(req in col_lower for req in ['mark-up', 'markup', 'mark up']):
+                    columnas_encontradas.append('mark-up')
             
             # Verificar columnas faltantes
-            for req in columnas_requeridas:
+            for req in columnas_requeridas_precios:
                 if req not in columnas_encontradas:
                     columnas_faltantes.append(req)
             
-            logger.info(f"Columnas requeridas encontradas en '{hoja_moura}': {columnas_encontradas}")
+            logger.info(f"Columnas de precios encontradas en '{hoja_moura}': {columnas_encontradas}")
             logger.info(f"Columnas faltantes: {columnas_faltantes}")
             
-            if columnas_faltantes:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"La hoja '{hoja_moura}' no contiene las columnas requeridas: {columnas_faltantes}. Columnas encontradas: {columnas_encontradas}"
-                )
+            # Si no tiene las columnas de precios, verificar si tiene productos y precios
+            if not columnas_encontradas:
+                # Buscar columnas con productos y precios
+                tiene_productos = False
+                tiene_precios = False
+                
+                for col in df.columns:
+                    col_lower = str(col).lower().strip()
+                    # Buscar columna con códigos de productos
+                    if any(palabra in col_lower for palabra in ['producto', 'codigo', 'item', 'sku']):
+                        tiene_productos = True
+                    # Buscar columna con precios
+                    if any(palabra in col_lower for palabra in ['precio', 'costo', 'valor', '$']):
+                        tiene_precios = True
+                
+                if tiene_productos and tiene_precios:
+                    logger.info(f"✅ Hoja '{hoja_moura}' válida como archivo de precios con productos y precios")
+                    columnas_encontradas = ['productos_y_precios']
+                else:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"La hoja '{hoja_moura}' no contiene columnas de rentabilidad/mark-up ni productos y precios válidos"
+                    )
+            else:
+                logger.info(f"✅ Hoja '{hoja_moura}' válida con columnas de rentabilidad/mark-up")
             
-            # Si llegamos aquí, la hoja tiene las columnas correctas
+            # Si llegamos aquí, la hoja es válida
             logger.info(f"✅ Hoja '{hoja_moura}' válida con {len(df)} filas")
             
             return {
-                "mensaje": f"Archivo analizado: {file.filename} - Hoja '{hoja_moura}' válida con {len(df)} filas",
+                "mensaje": f"Archivo de precios analizado: {file.filename} - Hoja '{hoja_moura}' válida con {len(df)} filas",
                 "hoja_procesada": hoja_moura,
                 "filas_encontradas": len(df),
                 "columnas_encontradas": columnas_encontradas,
+                "tipo_archivo": "precios",
                 "archivo_original": file.filename,
                 "tamaño_archivo": len(contenido),
                 "status": "exito"
@@ -421,7 +438,7 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
         logger.error(f"Tipo de error: {type(e).__name__}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error al cargar rentabilidades: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al cargar archivo de precios: {str(e)}")
 
 @app.post("/diagnostico-excel")
 async def diagnostico_excel(file: UploadFile = File(...)):
