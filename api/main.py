@@ -245,6 +245,42 @@ async def test_endpoint():
         "status": "ok"
     }
 
+@app.get("/test-simple")
+async def test_simple():
+    """Endpoint de test simple para verificar que el servidor funciona"""
+    return {
+        "status": "ok",
+        "mensaje": "Servidor funcionando correctamente",
+        "timestamp": "2024-12-19"
+    }
+
+@app.post("/test-upload")
+async def test_upload(file: UploadFile = File(...)):
+    """Endpoint de test para subir archivos"""
+    try:
+        logger.info(f"=== TEST UPLOAD ===")
+        logger.info(f"Archivo: {file.filename}")
+        logger.info(f"Content-Type: {file.content_type}")
+        
+        # Leer archivo
+        contenido = file.file.read()
+        logger.info(f"Tamaño: {len(contenido)} bytes")
+        
+        return {
+            "status": "ok",
+            "archivo": file.filename,
+            "tamaño": len(contenido),
+            "content_type": file.content_type,
+            "mensaje": "Archivo recibido correctamente"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en test upload: {str(e)}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
 @app.get("/health")
 async def health_check():
     """Health check para verificar que la aplicación funciona"""
