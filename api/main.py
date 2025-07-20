@@ -423,6 +423,113 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error al cargar rentabilidades: {str(e)}")
 
+@app.post("/diagnostico-excel")
+async def diagnostico_excel(file: UploadFile = File(...)):
+    """Endpoint para diagnóstico completo de archivos Excel"""
+    try:
+        logger.info(f"=== DIAGNÓSTICO COMPLETO EXCEL ===")
+        logger.info(f"Archivo: {file.filename}")
+        logger.info(f"Content-Type: {file.content_type}")
+        
+        # Leer archivo
+        contenido = file.file.read()
+        logger.info(f"Tamaño: {len(contenido)} bytes")
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="Archivo vacío")
+        
+        # Guardar temporalmente
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            import pandas as pd
+            
+            # Leer Excel
+            excel_file = pd.ExcelFile(temp_file_path)
+            logger.info(f"Excel con {len(excel_file.sheet_names)} hojas")
+            
+            diagnostico_completo = {
+                "archivo": file.filename,
+                "tamaño_bytes": len(contenido),
+                "total_hojas": len(excel_file.sheet_names),
+                "hojas": []
+            }
+            
+            # Analizar cada hoja
+            for i, sheet_name in enumerate(excel_file.sheet_names):
+                logger.info(f"=== ANALIZANDO HOJA {i+1}: {sheet_name} ===")
+                
+                # Leer hoja
+                df = pd.read_excel(temp_file_path, sheet_name=sheet_name)
+                
+                # Información básica
+                info_hoja = {
+                    "nombre": sheet_name,
+                    "filas": len(df),
+                    "columnas": len(df.columns),
+                    "nombres_columnas": list(df.columns),
+                    "tipos_columnas": df.dtypes.to_dict(),
+                    "es_hoja_moura": 'moura' in sheet_name.lower(),
+                    "primeras_filas": df.head(3).to_dict('records')
+                }
+                
+                # Buscar columnas requeridas
+                columnas_requeridas = {
+                    "canal": False,
+                    "línea": False, 
+                    "margen_minimo": False,
+                    "margen_optimo": False
+                }
+                
+                for col in df.columns:
+                    col_str = str(col).lower().strip()
+                    if any(palabra in col_str for palabra in ['canal', 'channel']):
+                        columnas_requeridas["canal"] = True
+                    if any(palabra in col_str for palabra in ['línea', 'linea', 'line']):
+                        columnas_requeridas["línea"] = True
+                    if any(palabra in col_str for palabra in ['margen mínimo', 'margen_minimo', 'minimo']):
+                        columnas_requeridas["margen_minimo"] = True
+                    if any(palabra in col_str for palabra in ['margen óptimo', 'margen_optimo', 'optimo']):
+                        columnas_requeridas["margen_optimo"] = True
+                
+                info_hoja["columnas_requeridas_encontradas"] = columnas_requeridas
+                info_hoja["tiene_todas_las_columnas"] = all(columnas_requeridas.values())
+                
+                diagnostico_completo["hojas"].append(info_hoja)
+                
+                logger.info(f"Hoja '{sheet_name}': {len(df)} filas, {len(df.columns)} columnas")
+                logger.info(f"Columnas: {list(df.columns)}")
+                logger.info(f"Es Moura: {info_hoja['es_hoja_moura']}")
+                logger.info(f"Tiene todas las columnas: {info_hoja['tiene_todas_las_columnas']}")
+            
+            # Resumen
+            hojas_moura = [h for h in diagnostico_completo["hojas"] if h["es_hoja_moura"]]
+            hojas_validas = [h for h in diagnostico_completo["hojas"] if h["tiene_todas_las_columnas"]]
+            
+            diagnostico_completo["resumen"] = {
+                "hojas_moura_encontradas": len(hojas_moura),
+                "hojas_con_todas_las_columnas": len(hojas_validas),
+                "puede_procesarse": len(hojas_moura) > 0 and len(hojas_validas) > 0
+            }
+            
+            logger.info(f"=== DIAGNÓSTICO COMPLETO ===")
+            logger.info(f"Resumen: {diagnostico_completo['resumen']}")
+            
+            return diagnostico_completo
+            
+        finally:
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except Exception as e:
+        logger.error(f"Error en diagnóstico: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error en diagnóstico: {str(e)}")
+
 @app.get("/api/estado-rentabilidad")
 async def obtener_estado_rentabilidad():
     """Obtiene el estado de las rentabilidades cargadas"""
