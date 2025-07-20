@@ -765,6 +765,7 @@
         }
 
         function subirPrecios(file) {
+            console.log('📤 Subiendo archivo de precios:', file.name);
             mostrarCarga('Subiendo archivo de precios...');
             
             const formData = new FormData();
@@ -774,8 +775,12 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('📡 Respuesta de subida de precios:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('📊 Resultado de subida de precios:', data);
                 ocultarCarga();
                 if (data.status === 'success') {
                     preciosCargados = true;
@@ -788,13 +793,14 @@
                 }
             })
             .catch(error => {
+                console.error('❌ Error subiendo precios:', error);
                 ocultarCarga();
                 mostrarAlerta('danger', '❌ Error al subir archivo de precios', 'preciosStatus');
-                console.error('Error:', error);
             });
         }
 
         function subirRentabilidades(file) {
+            console.log('📤 Subiendo archivo de rentabilidades:', file.name);
             mostrarCarga('Subiendo archivo de rentabilidades...');
             
             const formData = new FormData();
@@ -804,8 +810,12 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('📡 Respuesta de subida de rentabilidades:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('📊 Resultado de subida de rentabilidades:', data);
                 ocultarCarga();
                 if (data.status === 'success') {
                     rentabilidadesCargadas = true;
@@ -818,34 +828,49 @@
                 }
             })
             .catch(error => {
+                console.error('❌ Error subiendo rentabilidades:', error);
                 ocultarCarga();
                 mostrarAlerta('danger', '❌ Error al subir archivo de rentabilidades', 'rentabilidadesStatus');
-                console.error('Error:', error);
             });
         }
 
         function calcularPrecios() {
+            console.log('🚀 Iniciando cálculo de precios...');
+            
             // Verificar estado real del backend
             fetch('/api/estado-archivos')
-            .then(response => response.json())
+            .then(response => {
+                console.log('📡 Respuesta del estado:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('📊 Estado recibido:', data);
+                
                 if (!data.precios_cargados || !data.rentabilidades_cargadas) {
+                    console.log('❌ Archivos no cargados, mostrando alerta');
                     mostrarAlerta('warning', '⚠️ Debes cargar ambos archivos antes de calcular', 'calculoStatus');
                     return;
                 }
 
+                console.log('✅ Archivos cargados, iniciando proceso...');
+                
                 // Mostrar proceso paso a paso
                 mostrarProcesoPasoAPaso();
                 
                 // Simular tiempo de procesamiento
                 setTimeout(() => {
+                    console.log('🔄 Enviando petición de cálculo...');
                     mostrarCarga('🚀 Iniciando proceso de pricing...');
                     
                     fetch('/calcular-precios-con-rentabilidad', {
                         method: 'POST'
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log('📡 Respuesta del cálculo:', response.status);
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('📊 Resultado del cálculo:', data);
                         ocultarCarga();
                         if (data.status === 'success') {
                             mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
@@ -856,14 +881,14 @@
                         }
                     })
                     .catch(error => {
+                        console.error('❌ Error en cálculo:', error);
                         ocultarCarga();
                         mostrarAlerta('danger', '❌ Error al calcular precios', 'calculoStatus');
-                        console.error('Error:', error);
                     });
-                }, 500); // Esperar medio segundo para mostrar el proceso
+                }, 500);
             })
             .catch(error => {
-                console.error('Error verificando estado:', error);
+                console.error('❌ Error verificando estado:', error);
                 mostrarAlerta('danger', '❌ Error verificando estado de archivos', 'calculoStatus');
             });
         }
