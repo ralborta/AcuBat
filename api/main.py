@@ -26,6 +26,10 @@ templates = Jinja2Templates(directory="templates")
 # Variables globales para almacenar productos procesados
 productos_actuales = []
 
+# Variables globales para almacenar datos
+rentabilidades_data = None
+rentabilidades_filename = None
+
 # Importar módulos de forma segura
 try:
     from .logic import PricingLogic
@@ -348,6 +352,8 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/cargar-rentabilidades")
 async def upload_rentabilidades(file: UploadFile = File(...)):
     """Endpoint SIMPLE para subir archivo de rentabilidades"""
+    global rentabilidades_data, rentabilidades_filename
+    
     try:
         logger.info(f"=== CARGA SIMPLE DE RENTABILIDADES ===")
         logger.info(f"Archivo: {file.filename}")
@@ -378,18 +384,27 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             temp_file_path = temp_file.name
         
         try:
-            # Solo verificar que se puede leer
+            # Leer y guardar en memoria
             import pandas as pd
             excel_file = pd.ExcelFile(temp_file_path)
             
-            logger.info(f"✅ Archivo válido con {len(excel_file.sheet_names)} hojas")
+            # Guardar datos en memoria
+            rentabilidades_data = {}
+            for sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(temp_file_path, sheet_name=sheet_name)
+                rentabilidades_data[sheet_name] = df.to_dict('records')
+            
+            rentabilidades_filename = file.filename
+            
+            logger.info(f"✅ Archivo guardado en memoria: {file.filename} con {len(excel_file.sheet_names)} hojas")
             
             return {
                 "status": "success",
-                "mensaje": f"Archivo cargado exitosamente: {file.filename}",
+                "mensaje": f"Archivo de rentabilidades cargado exitosamente: {file.filename}",
                 "hojas": excel_file.sheet_names,
                 "total_hojas": len(excel_file.sheet_names),
-                "tamaño": len(contenido)
+                "tamaño": len(contenido),
+                "archivo_guardado": file.filename
             }
             
         except Exception as e:
@@ -523,17 +538,38 @@ async def obtener_estado_rentabilidad():
         if not MODULES_AVAILABLE:
             raise HTTPException(status_code=503, detail="Módulo de rentabilidad no disponible")
         
-        archivo_cargado = pricing_logic.rentabilidad_validator.archivo_cargado
-        resumen = pricing_logic.rentabilidad_validator.obtener_resumen_rentabilidad()
+        archivo_cargado = rentabilidades_filename
+        resumen = {} # No hay un resumen directo en memoria, solo el archivo
         
         return {
             "archivo_cargado": archivo_cargado,
-            "total_reglas": resumen.get('total_reglas', 0),
+            "total_reglas": 0, # No hay reglas en memoria
             "resumen": resumen
         }
     except Exception as e:
         logger.error(f"Error obteniendo estado de rentabilidad: {e}")
         raise HTTPException(status_code=500, detail=f"Error obteniendo estado: {str(e)}")
+
+@app.get("/api/verificar-rentabilidades")
+async def verificar_rentabilidades():
+    """Endpoint para verificar si hay rentabilidades cargadas"""
+    global rentabilidades_data, rentabilidades_filename
+    
+    if rentabilidades_data is None:
+        return {
+            "status": "no_cargado",
+            "mensaje": "No hay archivo de rentabilidades cargado",
+            "archivo": None,
+            "hojas": []
+        }
+    
+    return {
+        "status": "cargado",
+        "mensaje": f"Archivo de rentabilidades cargado: {rentabilidades_filename}",
+        "archivo": rentabilidades_filename,
+        "hojas": list(rentabilidades_data.keys()),
+        "total_hojas": len(rentabilidades_data)
+    }
 
 @app.get("/export/csv")
 async def export_csv():
