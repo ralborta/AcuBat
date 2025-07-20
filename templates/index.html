@@ -351,6 +351,9 @@
                     <button class="btn btn-modern btn-warning-modern" onclick="diagnosticarArchivos()" id="btnDiagnostico">
                         <i class="fas fa-search"></i> Diagnosticar
                     </button>
+                    <button class="btn btn-modern btn-info" onclick="diagnosticoDetallado()" id="btnDetallado">
+                        <i class="fas fa-microscope"></i> Ver Datos
+                    </button>
                 </div>
                 
                 <div id="calculoStatus" style="display: none; margin-top: 1rem;"></div>
@@ -734,6 +737,102 @@
             if (data.precios.cargado && data.rentabilidades.cargado) {
                 html += '<p>• Ambos archivos están listos para procesar</p>';
             }
+            html += '</div>';
+            
+            resultsContent.innerHTML = html;
+            resultsSection.style.display = 'block';
+        }
+
+        function diagnosticoDetallado() {
+            mostrarCarga('Analizando datos detallados...');
+            
+            fetch('/api/diagnostico-detallado')
+            .then(response => response.json())
+            .then(data => {
+                ocultarCarga();
+                mostrarDiagnosticoDetallado(data);
+            })
+            .catch(error => {
+                ocultarCarga();
+                mostrarAlerta('danger', '❌ Error al analizar datos', 'calculoStatus');
+                console.error('Error:', error);
+            });
+        }
+
+        function mostrarDiagnosticoDetallado(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = '<h4><i class="fas fa-microscope"></i> Análisis Detallado de Datos</h4>';
+            
+            // Datos de precios
+            if (data.precios.cargado && data.precios.datos_ejemplo.length > 0) {
+                html += '<div class="card mb-4">';
+                html += '<div class="card-header">📊 Datos de Precios (Primeros 3 productos)</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm table-striped">';
+                
+                // Header dinámico basado en las columnas del primer producto
+                const primerProducto = data.precios.datos_ejemplo[0];
+                html += '<thead><tr>';
+                Object.keys(primerProducto).forEach(col => {
+                    html += `<th>${col}</th>`;
+                });
+                html += '</tr></thead>';
+                
+                // Datos
+                html += '<tbody>';
+                data.precios.datos_ejemplo.forEach(producto => {
+                    html += '<tr>';
+                    Object.values(producto).forEach(valor => {
+                        html += `<td>${valor}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
+                html += '</div></div>';
+            }
+            
+            // Datos de rentabilidades
+            if (data.rentabilidades.cargado && data.rentabilidades.datos_ejemplo.length > 0) {
+                html += '<div class="card mb-4">';
+                html += '<div class="card-header">📈 Datos de Rentabilidades (Primeras 3 reglas)</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm table-striped">';
+                
+                // Header dinámico basado en las columnas de la primera regla
+                const primeraRegla = data.rentabilidades.datos_ejemplo[0];
+                html += '<thead><tr>';
+                Object.keys(primeraRegla).forEach(col => {
+                    html += `<th>${col}</th>`;
+                });
+                html += '</tr></thead>';
+                
+                // Datos
+                html += '<tbody>';
+                data.rentabilidades.datos_ejemplo.forEach(regla => {
+                    html += '<tr>';
+                    Object.values(regla).forEach(valor => {
+                        html += `<td>${valor}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
+                html += '</div></div>';
+            }
+            
+            // Recomendaciones
+            html += '<div class="alert alert-info">';
+            html += '<h6><i class="fas fa-lightbulb"></i> Análisis:</h6>';
+            html += '<p>• Revisa las columnas disponibles arriba</p>';
+            html += '<p>• Identifica cuáles son código, nombre y precio</p>';
+            html += '<p>• Verifica que los datos sean correctos</p>';
             html += '</div>';
             
             resultsContent.innerHTML = html;

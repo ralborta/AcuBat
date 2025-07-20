@@ -648,6 +648,43 @@ async def diagnostico_archivos():
             "rentabilidades": {"cargado": False}
         }
 
+@app.get("/api/diagnostico-detallado")
+async def diagnostico_detallado():
+    """Diagnóstico detallado de los datos cargados"""
+    global precios_data, rentabilidades_data
+    
+    try:
+        resultado = {
+            "precios": {
+                "cargado": precios_data is not None,
+                "hojas": list(precios_data.keys()) if precios_data else [],
+                "datos_ejemplo": []
+            },
+            "rentabilidades": {
+                "cargado": rentabilidades_data is not None,
+                "hojas": list(rentabilidades_data.keys()) if rentabilidades_data else [],
+                "datos_ejemplo": []
+            }
+        }
+        
+        # Mostrar primeros 3 productos como ejemplo
+        if precios_data and len(precios_data) > 0:
+            primera_hoja = list(precios_data.keys())[0]
+            productos = precios_data[primera_hoja]
+            resultado["precios"]["datos_ejemplo"] = productos[:3] if len(productos) >= 3 else productos
+        
+        # Mostrar primeras 3 reglas como ejemplo
+        if rentabilidades_data and len(rentabilidades_data) > 0:
+            primera_hoja = list(rentabilidades_data.keys())[0]
+            reglas = rentabilidades_data[primera_hoja]
+            resultado["rentabilidades"]["datos_ejemplo"] = reglas[:3] if len(reglas) >= 3 else reglas
+        
+        return resultado
+        
+    except Exception as e:
+        logger.error(f"Error en diagnóstico detallado: {str(e)}")
+        return {"error": str(e)}
+
 @app.get("/api/estado-rentabilidad")
 async def obtener_estado_rentabilidad():
     """Obtiene el estado de las rentabilidades cargadas"""
