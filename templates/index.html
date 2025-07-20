@@ -8,75 +8,144 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #2563eb;
+            --primary-color: #1e40af;
             --secondary-color: #64748b;
-            --success-color: #10b981;
-            --warning-color: #f59e0b;
-            --danger-color: #ef4444;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
             --dark-color: #1e293b;
             --light-color: #f8fafc;
+            --accent-color: #8b5cf6;
         }
 
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--dark-color);
         }
 
         .main-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            margin: 20px;
-            overflow: hidden;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
         }
 
         .header {
-            background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
+            background: linear-gradient(135deg, var(--primary-color), #1e3a8a);
             color: white;
-            padding: 2rem;
+            padding: 3rem 2rem;
             text-align: center;
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(30, 64, 175, 0.3);
         }
 
         .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: 3rem;
+            font-weight: 800;
             margin: 0;
+            letter-spacing: -0.02em;
         }
 
         .header p {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             opacity: 0.9;
             margin: 0.5rem 0 0 0;
+            font-weight: 400;
         }
 
-        .content-area {
-            padding: 2rem;
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
         }
 
-        .step-card {
+        .stat-card {
             background: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
         }
 
-        .step-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
         }
 
-        .step-card.active {
-            border-color: var(--primary-color);
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.productos {
+            background: linear-gradient(135deg, #059669, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.precios {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.rentabilidad {
+            background: linear-gradient(135deg, #d97706, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.calculados {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .content-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-section {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
         }
 
         .step-number {
-            background: var(--primary-color);
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
             color: white;
             width: 40px;
             height: 40px;
@@ -84,57 +153,73 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-right: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin: 0;
+        }
+
+        .section-description {
+            color: var(--secondary-color);
+            font-size: 0.95rem;
+            margin: 0.5rem 0 0 0;
+        }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: #f8fafc;
+            transition: all 0.3s ease;
+            cursor: pointer;
             margin-bottom: 1rem;
         }
 
-        .step-title {
-            font-size: 1.3rem;
+        .upload-zone:hover {
+            border-color: var(--primary-color);
+            background: #f0f9ff;
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--primary-color);
+            background: #dbeafe;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3.5rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-text {
+            font-size: 1.1rem;
             font-weight: 600;
             color: var(--dark-color);
             margin-bottom: 0.5rem;
         }
 
-        .step-description {
+        .upload-subtext {
             color: var(--secondary-color);
-            margin-bottom: 1rem;
-        }
-
-        .upload-zone {
-            border: 3px dashed var(--primary-color);
-            border-radius: 15px;
-            padding: 2rem;
-            text-align: center;
-            background: #f8fafc;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .upload-zone:hover {
-            background: #e0f2fe;
-            border-color: #1d4ed8;
-        }
-
-        .upload-zone.dragover {
-            background: #dbeafe;
-            border-color: #1d4ed8;
-            transform: scale(1.02);
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
+            font-size: 0.9rem;
         }
 
         .btn-modern {
-            border-radius: 10px;
-            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            padding: 0.875rem 1.75rem;
             font-weight: 600;
             border: none;
             transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.95rem;
+            text-transform: none;
+            letter-spacing: 0;
         }
 
         .btn-modern:hover {
@@ -143,87 +228,64 @@
         }
 
         .btn-primary-modern {
-            background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
+            background: linear-gradient(135deg, var(--primary-color), #1e3a8a);
             color: white;
         }
 
         .btn-success-modern {
-            background: linear-gradient(135deg, var(--success-color), #059669);
+            background: linear-gradient(135deg, var(--success-color), #047857);
             color: white;
         }
 
         .btn-warning-modern {
-            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            background: linear-gradient(135deg, var(--warning-color), #b45309);
             color: white;
         }
 
-        .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 0.9rem;
+        .btn-info-modern {
+            background: linear-gradient(135deg, var(--accent-color), #7c3aed);
+            color: white;
         }
 
-        .status-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-error {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .status-pending {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .progress-modern {
-            height: 8px;
-            border-radius: 10px;
-            background: #e2e8f0;
-            overflow: hidden;
-        }
-
-        .progress-bar-modern {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary-color), #1d4ed8);
-            border-radius: 10px;
-            transition: width 0.3s ease;
-        }
-
-        .results-section {
+        .actions-section {
             background: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-top: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            text-align: center;
         }
 
-        .alert-modern {
-            border-radius: 10px;
-            border: none;
-            padding: 1rem 1.5rem;
-            margin-bottom: 1rem;
+        .actions-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
         }
 
         .loading-spinner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
             display: none;
-            text-align: center;
-            padding: 2rem;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(5px);
         }
 
         .spinner-modern {
-            width: 3rem;
-            height: 3rem;
+            width: 50px;
+            height: 50px;
             border: 4px solid #e2e8f0;
             border-top: 4px solid var(--primary-color);
             border-radius: 50%;
@@ -235,64 +297,34 @@
             100% { transform: rotate(360deg); }
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+        .alert-modern {
+            border-radius: 12px;
+            border: none;
+            padding: 1rem 1.5rem;
+            font-weight: 500;
         }
 
-        .stat-card {
+        .results-section {
             background: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            margin-top: 2rem;
         }
 
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .stat-number.productos {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .stat-number.precios {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .stat-number.rentabilidad {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .stat-number.calculados {
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .stat-label {
-            color: var(--secondary-color);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        @media (max-width: 768px) {
+            .content-sections {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -304,104 +336,108 @@
             <p>Sistema de Pricing Inteligente</p>
         </div>
 
-        <!-- Content Area -->
-        <div class="content-area">
-            <!-- Stats Grid -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number productos" id="totalProductos">0</div>
-                    <div class="stat-label">Productos</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number precios" id="totalPrecios">0</div>
-                    <div class="stat-label">Precios Cargados</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number rentabilidad" id="totalRentabilidad">0</div>
-                    <div class="stat-label">Reglas de Rentabilidad</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number calculados" id="totalCalculados">0</div>
-                    <div class="stat-label">Precios Calculados</div>
-                </div>
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number productos" id="totalProductos">0</div>
+                <div class="stat-label">Productos</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-number precios" id="totalPrecios">0</div>
+                <div class="stat-label">Precios Cargados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number rentabilidad" id="totalRentabilidad">0</div>
+                <div class="stat-label">Reglas de Rentabilidad</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number calculados" id="totalCalculados">0</div>
+                <div class="stat-label">Precios Calculados</div>
+            </div>
+        </div>
 
-            <!-- Step 1: Cargar Precios -->
-            <div class="step-card" id="step1">
-                <div class="step-number">1</div>
-                <div class="step-title">Cargar Lista de Precios</div>
-                <div class="step-description">Sube tu archivo Excel con los precios base de los productos</div>
+        <!-- Content Sections -->
+        <div class="content-sections">
+            <!-- Upload Section 1 -->
+            <div class="upload-section">
+                <div class="section-header">
+                    <div class="step-number">1</div>
+                    <div>
+                        <h3 class="section-title">Cargar Lista de Precios</h3>
+                        <p class="section-description">Sube tu archivo Excel con los precios base de los productos</p>
+                    </div>
+                </div>
                 
                 <div class="upload-zone" id="preciosUploadZone" onclick="document.getElementById('preciosFileInput').click()">
                     <div class="upload-icon">
                         <i class="fas fa-file-excel"></i>
                     </div>
-                    <h5>Arrastra tu archivo de precios aquí</h5>
-                    <p class="text-muted">Solo archivos Excel (.xlsx, .xls)</p>
-                    <button class="btn btn-modern btn-primary-modern">
+                    <div class="upload-text">Arrastra tu archivo de precios aquí</div>
+                    <div class="upload-subtext">Solo archivos Excel (.xlsx, .xls)</div>
+                    <button class="btn btn-modern btn-primary-modern mt-3">
                         <i class="fas fa-upload"></i> Seleccionar Archivo
                     </button>
                 </div>
 
                 <input type="file" id="preciosFileInput" accept=".xlsx,.xls" style="display: none;">
-                
                 <div id="preciosStatus" style="display: none; margin-top: 1rem;"></div>
             </div>
 
-            <!-- Step 2: Cargar Rentabilidades -->
-            <div class="step-card" id="step2">
-                <div class="step-number">2</div>
-                <div class="step-title">Cargar Reglas de Rentabilidad</div>
-                <div class="step-description">Sube el archivo con las reglas de margen por canal y línea</div>
+            <!-- Upload Section 2 -->
+            <div class="upload-section">
+                <div class="section-header">
+                    <div class="step-number">2</div>
+                    <div>
+                        <h3 class="section-title">Cargar Reglas de Rentabilidad</h3>
+                        <p class="section-description">Sube el archivo con las reglas de margen por canal y línea</p>
+                    </div>
+                </div>
                 
                 <div class="upload-zone" id="rentabilidadesUploadZone" onclick="document.getElementById('rentabilidadesFileInput').click()">
                     <div class="upload-icon">
                         <i class="fas fa-chart-line"></i>
                     </div>
-                    <h5>Arrastra tu archivo de rentabilidades aquí</h5>
-                    <p class="text-muted">Solo archivos Excel (.xlsx, .xls)</p>
-                    <button class="btn btn-modern btn-primary-modern">
+                    <div class="upload-text">Arrastra tu archivo de rentabilidades aquí</div>
+                    <div class="upload-subtext">Solo archivos Excel (.xlsx, .xls)</div>
+                    <button class="btn btn-modern btn-primary-modern mt-3">
                         <i class="fas fa-upload"></i> Seleccionar Archivo
                     </button>
                 </div>
 
                 <input type="file" id="rentabilidadesFileInput" accept=".xlsx,.xls" style="display: none;">
-                
                 <div id="rentabilidadesStatus" style="display: none; margin-top: 1rem;"></div>
             </div>
+        </div>
 
-            <!-- Step 3: Calcular Precios -->
-            <div class="step-card" id="step3">
-                <div class="step-number">3</div>
-                <div class="step-title">Calcular Precios con Rentabilidad</div>
-                <div class="step-description">Aplica las reglas de rentabilidad a los precios base</div>
-                
-                <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-modern btn-success-modern" onclick="calcularPrecios()" id="btnCalcular">
-                        <i class="fas fa-calculator"></i> Calcular Precios
-                    </button>
-                    <button class="btn btn-modern btn-warning-modern" onclick="diagnosticarArchivos()" id="btnDiagnostico">
-                        <i class="fas fa-search"></i> Diagnosticar
-                    </button>
-                    <button class="btn btn-modern btn-info" onclick="diagnosticoDetallado()" id="btnDetallado">
-                        <i class="fas fa-microscope"></i> Ver Datos
-                    </button>
-                </div>
-                
-                <div id="calculoStatus" style="display: none; margin-top: 1rem;"></div>
+        <!-- Actions Section -->
+        <div class="actions-section">
+            <h3 class="actions-title">Calcular Precios con Rentabilidad</h3>
+            <div class="actions-grid">
+                <button class="btn btn-modern btn-success-modern" onclick="calcularPrecios()" id="btnCalcular">
+                    <i class="fas fa-calculator"></i> Calcular Precios
+                </button>
+                <button class="btn btn-modern btn-warning-modern" onclick="diagnosticarArchivos()" id="btnDiagnostico">
+                    <i class="fas fa-search"></i> Diagnosticar
+                </button>
+                <button class="btn btn-modern btn-info-modern" onclick="diagnosticoDetallado()" id="btnDetallado">
+                    <i class="fas fa-microscope"></i> Ver Datos
+                </button>
             </div>
+            <div id="calculoStatus" style="display: none; margin-top: 1.5rem;"></div>
+        </div>
 
-            <!-- Loading Spinner -->
-            <div class="loading-spinner" id="loadingSpinner">
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="text-center">
                 <div class="spinner-modern"></div>
                 <p class="mt-3" id="loadingMessage">Procesando...</p>
             </div>
+        </div>
 
-            <!-- Results Section -->
-            <div class="results-section" id="resultsSection" style="display: none;">
-                <h4><i class="fas fa-chart-bar"></i> Resultados del Cálculo</h4>
-                <div id="resultsContent"></div>
-            </div>
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h4><i class="fas fa-chart-bar"></i> Resultados del Cálculo</h4>
+            <div id="resultsContent"></div>
         </div>
     </div>
 
@@ -476,7 +512,7 @@
         }
 
         function mostrarCarga(mensaje) {
-            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('loadingSpinner').style.display = 'flex';
             document.getElementById('loadingMessage').textContent = mensaje;
         }
 
