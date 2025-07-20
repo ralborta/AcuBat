@@ -658,12 +658,14 @@ async def diagnostico_detallado():
             "precios": {
                 "cargado": precios_data is not None,
                 "hojas": list(precios_data.keys()) if precios_data else [],
-                "datos_ejemplo": []
+                "datos_ejemplo": [],
+                "total_productos": 0
             },
             "rentabilidades": {
                 "cargado": rentabilidades_data is not None,
                 "hojas": list(rentabilidades_data.keys()) if rentabilidades_data else [],
-                "datos_ejemplo": []
+                "datos_ejemplo": [],
+                "total_reglas": 0
             }
         }
         
@@ -671,19 +673,55 @@ async def diagnostico_detallado():
         if precios_data and len(precios_data) > 0:
             primera_hoja = list(precios_data.keys())[0]
             productos = precios_data[primera_hoja]
-            resultado["precios"]["datos_ejemplo"] = productos[:3] if len(productos) >= 3 else productos
+            resultado["precios"]["total_productos"] = len(productos)
+            
+            # Mostrar hasta 3 productos con manejo de errores
+            for i in range(min(3, len(productos))):
+                try:
+                    producto = productos[i]
+                    # Limpiar datos para evitar errores de serialización
+                    producto_limpio = {}
+                    for key, value in producto.items():
+                        if isinstance(value, (str, int, float, bool)):
+                            producto_limpio[str(key)] = str(value)
+                        else:
+                            producto_limpio[str(key)] = str(value) if value is not None else ""
+                    resultado["precios"]["datos_ejemplo"].append(producto_limpio)
+                except Exception as e:
+                    logger.error(f"Error procesando producto {i}: {e}")
+                    resultado["precios"]["datos_ejemplo"].append({"error": f"Error en producto {i}: {str(e)}"})
         
         # Mostrar primeras 3 reglas como ejemplo
         if rentabilidades_data and len(rentabilidades_data) > 0:
             primera_hoja = list(rentabilidades_data.keys())[0]
             reglas = rentabilidades_data[primera_hoja]
-            resultado["rentabilidades"]["datos_ejemplo"] = reglas[:3] if len(reglas) >= 3 else reglas
+            resultado["rentabilidades"]["total_reglas"] = len(reglas)
+            
+            # Mostrar hasta 3 reglas con manejo de errores
+            for i in range(min(3, len(reglas))):
+                try:
+                    regla = reglas[i]
+                    # Limpiar datos para evitar errores de serialización
+                    regla_limpia = {}
+                    for key, value in regla.items():
+                        if isinstance(value, (str, int, float, bool)):
+                            regla_limpia[str(key)] = str(value)
+                        else:
+                            regla_limpia[str(key)] = str(value) if value is not None else ""
+                    resultado["rentabilidades"]["datos_ejemplo"].append(regla_limpia)
+                except Exception as e:
+                    logger.error(f"Error procesando regla {i}: {e}")
+                    resultado["rentabilidades"]["datos_ejemplo"].append({"error": f"Error en regla {i}: {str(e)}"})
         
         return resultado
         
     except Exception as e:
         logger.error(f"Error en diagnóstico detallado: {str(e)}")
-        return {"error": str(e)}
+        return {
+            "error": str(e),
+            "precios": {"cargado": False, "datos_ejemplo": []},
+            "rentabilidades": {"cargado": False, "datos_ejemplo": []}
+        }
 
 @app.get("/api/estado-rentabilidad")
 async def obtener_estado_rentabilidad():
@@ -979,15 +1017,23 @@ async def calcular_precios_con_rentabilidad():
                 
                 # Calcular precio con margen
                 # Buscar columna de precio con diferentes nombres posibles
-                posibles_columnas_precio = ['precio', 'price', 'valor', 'costo', 'cost', 'precio_base', 'precio_lista']
+                posibles_columnas_precio = [
+                    'precio', 'price', 'valor', 'costo', 'cost', 'precio_base', 'precio_lista',
+                    'precio_venta', 'precio_final', 'precio_publico', 'precio_mayorista',
+                    'precio_minorista', 'precio_distribuidor', 'precio_neto', 'precio_bruto'
+                ]
                 precio_base = 0
+                columna_precio_encontrada = None
                 
                 for col_precio in posibles_columnas_precio:
                     if col_precio in producto:
                         try:
-                            precio_base = float(producto[col_precio])
-                            logger.info(f"Precio encontrado en columna '{col_precio}': {precio_base}")
-                            break
+                            precio_temp = float(producto[col_precio])
+                            if precio_temp > 0:
+                                precio_base = precio_temp
+                                columna_precio_encontrada = col_precio
+                                logger.info(f"Precio encontrado en columna '{col_precio}': {precio_base}")
+                                break
                         except (ValueError, TypeError):
                             continue
                 
@@ -996,14 +1042,16 @@ async def calcular_precios_con_rentabilidad():
                     for col, valor in producto.items():
                         if isinstance(valor, (int, float)) and valor > 0:
                             precio_base = float(valor)
+                            columna_precio_encontrada = col
                             logger.info(f"Precio encontrado en columna numérica '{col}': {precio_base}")
                             break
                         elif isinstance(valor, str):
                             try:
                                 # Intentar convertir string a número
-                                precio_temp = float(valor.replace('$', '').replace(',', ''))
+                                precio_temp = float(valor.replace('$', '').replace(',', '').replace(' ', ''))
                                 if precio_temp > 0:
                                     precio_base = precio_temp
+                                    columna_precio_encontrada = col
                                     logger.info(f"Precio encontrado en columna string '{col}': {precio_base}")
                                     break
                             except (ValueError, TypeError):
@@ -1046,17 +1094,18 @@ async def calcular_precios_con_rentabilidad():
                 
                 # Crear producto calculado
                 producto_calculado = {
-                    'codigo': producto.get('codigo', producto.get('producto', 'N/A')),
-                    'nombre': producto.get('nombre', producto.get('descripcion', 'N/A')),
-                    'marca': producto.get('marca', 'N/A'),
-                    'canal': producto.get('canal', 'N/A'),
-                    'linea': producto.get('linea', 'N/A'),
+                    'codigo': producto.get('codigo', producto.get('producto', producto.get('sku', producto.get('id', 'N/A')))),
+                    'nombre': producto.get('nombre', producto.get('descripcion', producto.get('producto', producto.get('desc', 'N/A')))),
+                    'marca': producto.get('marca', producto.get('brand', 'N/A')),
+                    'canal': producto.get('canal', producto.get('channel', 'N/A')),
+                    'linea': producto.get('linea', producto.get('line', producto.get('categoria', 'N/A'))),
                     'precio_base': precio_base,
                     'precio_final': round(precio_final, 2),
                     'margen_aplicado': margen_optimo,
                     'margen_real': round(margen_real, 1),
                     'margen_minimo': margen_minimo,
                     'regla_usada': regla_encontrada.get('descripcion', 'Default') if regla_encontrada else 'Default',
+                    'columna_precio_usada': columna_precio_encontrada,
                     'alertas': alertas,
                     'estado': 'OK' if not alertas else 'Revisar'
                 }
