@@ -723,10 +723,23 @@
             const estadoPrecios = document.getElementById('estadoPrecios');
             const estadoRentabilidades = document.getElementById('estadoRentabilidades');
             
+            console.log('🔄 Actualizando estado de archivos...');
+            
             // Verificar estado actual
             fetch('/api/estado-archivos')
-            .then(response => response.json())
+            .then(response => {
+                console.log('📡 Respuesta de estado:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('📊 Estado recibido del backend:', data);
+                
+                // Actualizar variables globales del frontend
+                preciosCargados = data.precios_cargados;
+                rentabilidadesCargadas = data.rentabilidades_cargadas;
+                
+                console.log('🔄 Variables actualizadas - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
+                
                 if (data.precios_cargados) {
                     estadoPrecios.innerHTML = '<i class="fas fa-check-circle text-success"></i> Archivo de precios cargado';
                     estadoPrecios.className = 'alert alert-success';
@@ -744,7 +757,7 @@
                 }
             })
             .catch(error => {
-                console.error('Error verificando estado:', error);
+                console.error('❌ Error verificando estado:', error);
             });
         }
 
@@ -836,61 +849,49 @@
 
         function calcularPrecios() {
             console.log('🚀 Iniciando cálculo de precios...');
+            console.log('📊 Estado actual - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
             
-            // Verificar estado real del backend
-            fetch('/api/estado-archivos')
-            .then(response => {
-                console.log('📡 Respuesta del estado:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('📊 Estado recibido:', data);
-                
-                if (!data.precios_cargados || !data.rentabilidades_cargadas) {
-                    console.log('❌ Archivos no cargados, mostrando alerta');
-                    mostrarAlerta('warning', '⚠️ Debes cargar ambos archivos antes de calcular', 'calculoStatus');
-                    return;
-                }
+            // Verificar estado usando variables del frontend (que sabemos que funcionan)
+            if (!preciosCargados || !rentabilidadesCargadas) {
+                console.log('❌ Archivos no cargados, mostrando alerta');
+                mostrarAlerta('warning', '⚠️ Debes cargar ambos archivos antes de calcular', 'calculoStatus');
+                return;
+            }
 
-                console.log('✅ Archivos cargados, iniciando proceso...');
+            console.log('✅ Archivos cargados, iniciando proceso...');
+            
+            // Mostrar proceso paso a paso
+            mostrarProcesoPasoAPaso();
+            
+            // Simular tiempo de procesamiento
+            setTimeout(() => {
+                console.log('🔄 Enviando petición de cálculo...');
+                mostrarCarga('🚀 Iniciando proceso de pricing...');
                 
-                // Mostrar proceso paso a paso
-                mostrarProcesoPasoAPaso();
-                
-                // Simular tiempo de procesamiento
-                setTimeout(() => {
-                    console.log('🔄 Enviando petición de cálculo...');
-                    mostrarCarga('🚀 Iniciando proceso de pricing...');
-                    
-                    fetch('/calcular-precios-con-rentabilidad', {
-                        method: 'POST'
-                    })
-                    .then(response => {
-                        console.log('📡 Respuesta del cálculo:', response.status);
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('📊 Resultado del cálculo:', data);
-                        ocultarCarga();
-                        if (data.status === 'success') {
-                            mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
-                            mostrarPasosCompletados(data.pasos_completados, data.resumen);
-                            document.getElementById('totalCalculados').textContent = data.productos || '0';
-                        } else {
-                            mostrarAlerta('danger', `❌ ${data.mensaje}`, 'calculoStatus');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('❌ Error en cálculo:', error);
-                        ocultarCarga();
-                        mostrarAlerta('danger', '❌ Error al calcular precios', 'calculoStatus');
-                    });
-                }, 500);
-            })
-            .catch(error => {
-                console.error('❌ Error verificando estado:', error);
-                mostrarAlerta('danger', '❌ Error verificando estado de archivos', 'calculoStatus');
-            });
+                fetch('/calcular-precios-con-rentabilidad', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    console.log('📡 Respuesta del cálculo:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('📊 Resultado del cálculo:', data);
+                    ocultarCarga();
+                    if (data.status === 'success') {
+                        mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
+                        mostrarPasosCompletados(data.pasos_completados, data.resumen);
+                        document.getElementById('totalCalculados').textContent = data.productos || '0';
+                    } else {
+                        mostrarAlerta('danger', `❌ ${data.mensaje}`, 'calculoStatus');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Error en cálculo:', error);
+                    ocultarCarga();
+                    mostrarAlerta('danger', '❌ Error al calcular precios', 'calculoStatus');
+                });
+            }, 500);
         }
 
         function mostrarPasosCompletados(pasos, resumen) {
