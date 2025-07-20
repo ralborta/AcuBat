@@ -700,16 +700,22 @@
                     // Completar paso anterior
                     if (currentStep > 0) {
                         const prevStep = document.getElementById(steps[currentStep - 1]);
-                        const prevIcon = prevStep.querySelector('.step-icon i');
-                        prevIcon.className = 'fas fa-check-circle text-success';
-                        prevStep.classList.remove('active');
-                        prevStep.classList.add('completed');
+                        if (prevStep) {  // Verificar que el elemento existe
+                            const prevIcon = prevStep.querySelector('.step-icon i');
+                            if (prevIcon) {  // Verificar que el icono existe
+                                prevIcon.className = 'fas fa-check-circle text-success';
+                            }
+                            prevStep.classList.remove('active');
+                            prevStep.classList.add('completed');
+                        }
                     }
                     
                     // Activar paso actual
                     if (currentStep < steps.length) {
                         const currentStepEl = document.getElementById(steps[currentStep]);
-                        currentStepEl.classList.add('active');
+                        if (currentStepEl) {  // Verificar que el elemento existe
+                            currentStepEl.classList.add('active');
+                        }
                     }
                     
                     currentStep++;
@@ -881,7 +887,7 @@
                     if (data.status === 'success') {
                         mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
                         mostrarPasosCompletados(data.pasos_completados, data.resumen);
-                        document.getElementById('totalCalculados').textContent = data.productos || '0';
+                        document.getElementById('totalCalculados').textContent = data.resumen?.total_productos || data.productos || '0';
                     } else {
                         mostrarAlerta('danger', `❌ ${data.mensaje}`, 'calculoStatus');
                     }
