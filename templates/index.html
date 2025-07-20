@@ -714,13 +714,9 @@
         }
 
         function actualizarPasos() {
-            // Actualizar visual de los pasos
-            if (preciosCargados) {
-                document.getElementById('step1').classList.add('active');
-            }
-            if (rentabilidadesCargadas) {
-                document.getElementById('step2').classList.add('active');
-            }
+            // En el nuevo diseño no necesitamos actualizar pasos visuales
+            // Los elementos se muestran/ocultan automáticamente
+            console.log('Pasos actualizados - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
         }
 
         function verificarEstado() {
