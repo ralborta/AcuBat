@@ -769,11 +769,19 @@ async def obtener_estado_archivos():
     global precios_data, rentabilidades_data
     
     try:
-        return {
+        logger.info(f"🔍 Verificando estado de archivos:")
+        logger.info(f"  - precios_data: {precios_data is not None} ({type(precios_data)})")
+        logger.info(f"  - rentabilidades_data: {rentabilidades_data is not None} ({type(rentabilidades_data)})")
+        
+        estado = {
             "precios_cargados": precios_data is not None,
             "rentabilidades_cargadas": rentabilidades_data is not None,
             "listo_para_procesar": precios_data is not None and rentabilidades_data is not None
         }
+        
+        logger.info(f"✅ Estado retornado: {estado}")
+        return estado
+        
     except Exception as e:
         logger.error(f"Error obteniendo estado de archivos: {e}")
         return {
@@ -927,13 +935,19 @@ async def calcular_precios_con_rentabilidad():
         logger.info("🚀 Iniciando proceso de pricing simplificado...")
         
         # Verificar que tengamos ambos archivos
+        logger.info(f"🔍 Verificando archivos antes de procesar:")
+        logger.info(f"  - precios_data: {precios_data is not None}")
+        logger.info(f"  - rentabilidades_data: {rentabilidades_data is not None}")
+        
         if precios_data is None:
+            logger.warning("❌ No hay archivo de precios cargado")
             return {
                 "status": "error",
                 "mensaje": "❌ No hay archivo de precios cargado. Carga primero la lista de precios."
             }
         
         if rentabilidades_data is None:
+            logger.warning("❌ No hay archivo de rentabilidades cargado")
             return {
                 "status": "error", 
                 "mensaje": "❌ No hay archivo de rentabilidades cargado. Carga primero las reglas de rentabilidad."
