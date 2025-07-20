@@ -5,6 +5,10 @@ import logging
 import io
 import os
 import json
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
 
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
