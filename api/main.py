@@ -29,6 +29,8 @@ productos_actuales = []
 # Variables globales para almacenar datos
 rentabilidades_data = None
 rentabilidades_filename = None
+precios_data = None
+precios_filename = None
 
 # Importar módulos de forma segura
 try:
@@ -424,6 +426,81 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             "mensaje": f"Error: {str(e)}"
         }
 
+@app.post("/cargar-precios")
+async def upload_precios(file: UploadFile = File(...)):
+    """Endpoint para subir archivo de precios"""
+    global precios_data, precios_filename
+    
+    try:
+        logger.info(f"=== CARGA SIMPLE DE PRECIOS ===")
+        logger.info(f"Archivo: {file.filename}")
+        
+        # Verificar que sea Excel
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            return {
+                "status": "error",
+                "mensaje": "Solo archivos Excel (.xlsx, .xls)"
+            }
+        
+        # Leer archivo
+        contenido = file.file.read()
+        logger.info(f"Tamaño: {len(contenido)} bytes")
+        
+        if len(contenido) == 0:
+            return {
+                "status": "error", 
+                "mensaje": "Archivo vacío"
+            }
+        
+        # Guardar temporalmente
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
+            temp_file.write(contenido)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Leer y guardar en memoria
+            import pandas as pd
+            excel_file = pd.ExcelFile(temp_file_path)
+            
+            # Guardar datos en memoria
+            precios_data = {}
+            for sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(temp_file_path, sheet_name=sheet_name)
+                precios_data[sheet_name] = df.to_dict('records')
+            
+            precios_filename = file.filename
+            
+            logger.info(f"✅ Archivo guardado en memoria: {file.filename} con {len(excel_file.sheet_names)} hojas")
+            
+            return {
+                "status": "success",
+                "mensaje": f"Archivo de precios cargado exitosamente: {file.filename}",
+                "hojas": excel_file.sheet_names,
+                "total_hojas": len(excel_file.sheet_names),
+                "tamaño": len(contenido),
+                "archivo_guardado": file.filename
+            }
+            
+        except Exception as e:
+            logger.error(f"Error leyendo Excel: {str(e)}")
+            return {
+                "status": "error",
+                "mensaje": f"Error al leer archivo Excel: {str(e)}"
+            }
+        finally:
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+        
+    except Exception as e:
+        logger.error(f"Error general: {str(e)}")
+        return {
+            "status": "error",
+            "mensaje": f"Error: {str(e)}"
+        }
+
 @app.post("/diagnostico-excel")
 async def diagnostico_excel(file: UploadFile = File(...)):
     """Endpoint para diagnóstico completo de archivos Excel"""
@@ -706,3 +783,80 @@ async def obtener_sugerencias_precio(codigo_producto: str):
     except Exception as e:
         logger.error(f"Error obteniendo sugerencias para {codigo_producto}: {e}")
         raise HTTPException(status_code=500, detail=f"Error obteniendo sugerencias: {str(e)}") 
+
+@app.post("/calcular-precios-con-rentabilidad")
+async def calcular_precios_con_rentabilidad():
+    """Endpoint para calcular precios aplicando rentabilidad"""
+    global precios_data, rentabilidades_data
+    
+    try:
+        logger.info(f"=== CALCULAR PRECIOS CON RENTABILIDAD ===")
+        
+        # Verificar que tengamos ambos archivos
+        if precios_data is None:
+            return {
+                "status": "error",
+                "mensaje": "No hay archivo de precios cargado"
+            }
+        
+        if rentabilidades_data is None:
+            return {
+                "status": "error", 
+                "mensaje": "No hay archivo de rentabilidades cargado"
+            }
+        
+        logger.info(f"Precios cargados: {list(precios_data.keys())}")
+        logger.info(f"Rentabilidades cargadas: {list(rentabilidades_data.keys())}")
+        
+        # Buscar hoja Moura en ambos archivos
+        hoja_moura_precios = None
+        hoja_moura_rentabilidad = None
+        
+        for hoja in precios_data.keys():
+            if 'moura' in hoja.lower():
+                hoja_moura_precios = hoja
+                break
+        
+        for hoja in rentabilidades_data.keys():
+            if 'moura' in hoja.lower():
+                hoja_moura_rentabilidad = hoja
+                break
+        
+        if not hoja_moura_precios:
+            return {
+                "status": "error",
+                "mensaje": "No se encontró hoja 'Moura' en el archivo de precios"
+            }
+        
+        if not hoja_moura_rentabilidad:
+            return {
+                "status": "error", 
+                "mensaje": "No se encontró hoja 'Moura' en el archivo de rentabilidades"
+            }
+        
+        logger.info(f"✅ Procesando: Precios en '{hoja_moura_precios}' y Rentabilidad en '{hoja_moura_rentabilidad}'")
+        
+        # Obtener datos
+        precios_moura = precios_data[hoja_moura_precios]
+        rentabilidad_moura = rentabilidades_data[hoja_moura_rentabilidad]
+        
+        logger.info(f"Productos en precios: {len(precios_moura)}")
+        logger.info(f"Reglas en rentabilidad: {len(rentabilidad_moura)}")
+        
+        # Por ahora solo devolver información básica
+        return {
+            "status": "success",
+            "mensaje": f"Archivos listos para procesamiento",
+            "precios_hoja": hoja_moura_precios,
+            "rentabilidad_hoja": hoja_moura_rentabilidad,
+            "total_productos": len(precios_moura),
+            "total_reglas": len(rentabilidad_moura),
+            "proximo_paso": "Implementar cálculo de precios con margen"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculando precios: {str(e)}")
+        return {
+            "status": "error",
+            "mensaje": f"Error: {str(e)}"
+        } 
