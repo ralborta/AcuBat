@@ -883,11 +883,22 @@
                 })
                 .then(data => {
                     console.log('📊 Resultado del cálculo:', data);
+                    console.log('🔍 Análisis detallado del resultado:');
+                    console.log('  - Status:', data.status);
+                    console.log('  - Mensaje:', data.mensaje);
+                    console.log('  - Productos:', data.productos);
+                    console.log('  - Resumen:', data.resumen);
+                    console.log('  - Total productos en resumen:', data.resumen?.total_productos);
+                    console.log('  - Total productos directo:', data.productos);
+                    
                     ocultarCarga();
                     if (data.status === 'success') {
                         mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
                         mostrarPasosCompletados(data.pasos_completados, data.resumen);
-                        document.getElementById('totalCalculados').textContent = data.resumen?.total_productos || data.productos || '0';
+                        
+                        const totalProductos = data.resumen?.total_productos || data.productos || '0';
+                        console.log('📊 Total productos a mostrar:', totalProductos);
+                        document.getElementById('totalCalculados').textContent = totalProductos;
                     } else {
                         mostrarAlerta('danger', `❌ ${data.mensaje}`, 'calculoStatus');
                     }
