@@ -608,6 +608,46 @@ async def diagnostico_excel(file: UploadFile = File(...)):
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error en diagnóstico: {str(e)}")
 
+@app.get("/api/diagnostico-archivos")
+async def diagnostico_archivos():
+    """Diagnosticar qué archivos y hojas están cargados"""
+    global precios_data, rentabilidades_data, precios_filename, rentabilidades_filename
+    
+    try:
+        resultado = {
+            "precios": {
+                "cargado": precios_data is not None,
+                "archivo": precios_filename,
+                "hojas": list(precios_data.keys()) if precios_data else []
+            },
+            "rentabilidades": {
+                "cargado": rentabilidades_data is not None,
+                "archivo": rentabilidades_filename,
+                "hojas": list(rentabilidades_data.keys()) if rentabilidades_data else []
+            }
+        }
+        
+        # Agregar información de columnas si hay datos
+        if precios_data and len(precios_data) > 0:
+            primera_hoja = list(precios_data.keys())[0]
+            if len(precios_data[primera_hoja]) > 0:
+                resultado["precios"]["columnas"] = list(precios_data[primera_hoja][0].keys())
+        
+        if rentabilidades_data and len(rentabilidades_data) > 0:
+            primera_hoja = list(rentabilidades_data.keys())[0]
+            if len(rentabilidades_data[primera_hoja]) > 0:
+                resultado["rentabilidades"]["columnas"] = list(rentabilidades_data[primera_hoja][0].keys())
+        
+        return resultado
+        
+    except Exception as e:
+        logger.error(f"Error en diagnóstico: {str(e)}")
+        return {
+            "error": str(e),
+            "precios": {"cargado": False},
+            "rentabilidades": {"cargado": False}
+        }
+
 @app.get("/api/estado-rentabilidad")
 async def obtener_estado_rentabilidad():
     """Obtiene el estado de las rentabilidades cargadas"""
@@ -808,49 +848,66 @@ async def calcular_precios_con_rentabilidad():
         logger.info(f"Precios cargados: {list(precios_data.keys())}")
         logger.info(f"Rentabilidades cargadas: {list(rentabilidades_data.keys())}")
         
-        # Buscar hoja Moura en ambos archivos
-        hoja_moura_precios = None
-        hoja_moura_rentabilidad = None
+        # Buscar hojas disponibles (más flexible)
+        hojas_precios = list(precios_data.keys())
+        hojas_rentabilidad = list(rentabilidades_data.keys())
         
-        for hoja in precios_data.keys():
-            if 'moura' in hoja.lower():
-                hoja_moura_precios = hoja
+        # Usar la primera hoja disponible o buscar coincidencias
+        hoja_precios = None
+        hoja_rentabilidad = None
+        
+        # Buscar coincidencias por nombre
+        for hoja_precio in hojas_precios:
+            for hoja_rent in hojas_rentabilidad:
+                if hoja_precio.lower() == hoja_rent.lower():
+                    hoja_precios = hoja_precio
+                    hoja_rentabilidad = hoja_rent
+                    break
+            if hoja_precios:
                 break
         
-        for hoja in rentabilidades_data.keys():
-            if 'moura' in hoja.lower():
-                hoja_moura_rentabilidad = hoja
-                break
+        # Si no hay coincidencias, usar las primeras hojas disponibles
+        if not hoja_precios:
+            hoja_precios = hojas_precios[0] if hojas_precios else None
+            hoja_rentabilidad = hojas_rentabilidad[0] if hojas_rentabilidad else None
         
-        if not hoja_moura_precios:
+        if not hoja_precios:
             return {
                 "status": "error",
-                "mensaje": "No se encontró hoja 'Moura' en el archivo de precios"
+                "mensaje": "No se encontraron hojas en el archivo de precios"
             }
         
-        if not hoja_moura_rentabilidad:
+        if not hoja_rentabilidad:
             return {
                 "status": "error", 
-                "mensaje": "No se encontró hoja 'Moura' en el archivo de rentabilidades"
+                "mensaje": "No se encontraron hojas en el archivo de rentabilidades"
             }
         
-        logger.info(f"✅ Procesando: Precios en '{hoja_moura_precios}' y Rentabilidad en '{hoja_moura_rentabilidad}'")
+        logger.info(f"✅ Procesando: Precios en '{hoja_precios}' y Rentabilidad en '{hoja_rentabilidad}'")
         
         # Obtener datos
-        precios_moura = precios_data[hoja_moura_precios]
-        rentabilidad_moura = rentabilidades_data[hoja_moura_rentabilidad]
+        precios_hoja = precios_data[hoja_precios]
+        rentabilidad_hoja = rentabilidades_data[hoja_rentabilidad]
         
-        logger.info(f"Productos en precios: {len(precios_moura)}")
-        logger.info(f"Reglas en rentabilidad: {len(rentabilidad_moura)}")
+        logger.info(f"Productos en precios: {len(precios_hoja)}")
+        logger.info(f"Reglas en rentabilidad: {len(rentabilidad_hoja)}")
+        
+        # Mostrar columnas disponibles para debugging
+        if len(precios_hoja) > 0:
+            logger.info(f"Columnas en precios: {list(precios_hoja[0].keys())}")
+        if len(rentabilidad_hoja) > 0:
+            logger.info(f"Columnas en rentabilidad: {list(rentabilidad_hoja[0].keys())}")
         
         # Por ahora solo devolver información básica
         return {
             "status": "success",
             "mensaje": f"Archivos listos para procesamiento",
-            "precios_hoja": hoja_moura_precios,
-            "rentabilidad_hoja": hoja_moura_rentabilidad,
-            "total_productos": len(precios_moura),
-            "total_reglas": len(rentabilidad_moura),
+            "precios_hoja": hoja_precios,
+            "rentabilidad_hoja": hoja_rentabilidad,
+            "total_productos": len(precios_hoja),
+            "total_reglas": len(rentabilidad_hoja),
+            "hojas_disponibles_precios": hojas_precios,
+            "hojas_disponibles_rentabilidad": hojas_rentabilidad,
             "proximo_paso": "Implementar cálculo de precios con margen"
         }
         

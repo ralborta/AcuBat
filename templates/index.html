@@ -344,9 +344,14 @@
                 <div class="step-title">Calcular Precios con Rentabilidad</div>
                 <div class="step-description">Aplica las reglas de rentabilidad a los precios base</div>
                 
-                <button class="btn btn-modern btn-success-modern" onclick="calcularPrecios()" id="btnCalcular">
-                    <i class="fas fa-calculator"></i> Calcular Precios
-                </button>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-modern btn-success-modern" onclick="calcularPrecios()" id="btnCalcular">
+                        <i class="fas fa-calculator"></i> Calcular Precios
+                    </button>
+                    <button class="btn btn-modern btn-warning-modern" onclick="diagnosticarArchivos()" id="btnDiagnostico">
+                        <i class="fas fa-search"></i> Diagnosticar
+                    </button>
+                </div>
                 
                 <div id="calculoStatus" style="display: none; margin-top: 1rem;"></div>
             </div>
@@ -600,6 +605,78 @@
             .catch(error => {
                 console.error('Error verificando estado:', error);
             });
+        }
+
+        function diagnosticarArchivos() {
+            mostrarCarga('Diagnosticando archivos...');
+            
+            fetch('/api/diagnostico-archivos')
+            .then(response => response.json())
+            .then(data => {
+                ocultarCarga();
+                mostrarDiagnostico(data);
+            })
+            .catch(error => {
+                ocultarCarga();
+                mostrarAlerta('danger', '❌ Error al diagnosticar archivos', 'calculoStatus');
+                console.error('Error:', error);
+            });
+        }
+
+        function mostrarDiagnostico(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = '<h5><i class="fas fa-search"></i> Diagnóstico de Archivos</h5>';
+            
+            // Información de precios
+            html += '<div class="row mb-3">';
+            html += '<div class="col-md-6">';
+            html += '<div class="card">';
+            html += '<div class="card-header">📊 Archivo de Precios</div>';
+            html += '<div class="card-body">';
+            html += `<p><strong>Estado:</strong> ${data.precios.cargado ? '✅ Cargado' : '❌ No cargado'}</p>`;
+            if (data.precios.cargado) {
+                html += `<p><strong>Archivo:</strong> ${data.precios.archivo || 'N/A'}</p>`;
+                html += `<p><strong>Hojas:</strong> ${data.precios.hojas.join(', ') || 'Ninguna'}</p>`;
+                if (data.precios.columnas) {
+                    html += `<p><strong>Columnas:</strong> ${data.precios.columnas.join(', ')}</p>`;
+                }
+            }
+            html += '</div></div></div>';
+            
+            // Información de rentabilidades
+            html += '<div class="col-md-6">';
+            html += '<div class="card">';
+            html += '<div class="card-header">📈 Archivo de Rentabilidades</div>';
+            html += '<div class="card-body">';
+            html += `<p><strong>Estado:</strong> ${data.rentabilidades.cargado ? '✅ Cargado' : '❌ No cargado'}</p>`;
+            if (data.rentabilidades.cargado) {
+                html += `<p><strong>Archivo:</strong> ${data.rentabilidades.archivo || 'N/A'}</p>`;
+                html += `<p><strong>Hojas:</strong> ${data.rentabilidades.hojas.join(', ') || 'Ninguna'}</p>`;
+                if (data.rentabilidades.columnas) {
+                    html += `<p><strong>Columnas:</strong> ${data.rentabilidades.columnas.join(', ')}</p>`;
+                }
+            }
+            html += '</div></div></div>';
+            html += '</div>';
+            
+            // Recomendaciones
+            html += '<div class="alert alert-info">';
+            html += '<h6><i class="fas fa-lightbulb"></i> Recomendaciones:</h6>';
+            if (!data.precios.cargado) {
+                html += '<p>• Carga primero un archivo de precios</p>';
+            }
+            if (!data.rentabilidades.cargado) {
+                html += '<p>• Carga luego un archivo de rentabilidades</p>';
+            }
+            if (data.precios.cargado && data.rentabilidades.cargado) {
+                html += '<p>• Ambos archivos están listos para procesar</p>';
+            }
+            html += '</div>';
+            
+            resultsContent.innerHTML = html;
+            resultsSection.style.display = 'block';
         }
     </script>
 </body>
