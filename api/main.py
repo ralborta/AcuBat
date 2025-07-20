@@ -901,47 +901,45 @@ async def obtener_sugerencias_precio(codigo_producto: str):
 
 @app.post("/calcular-precios-con-rentabilidad")
 async def calcular_precios_con_rentabilidad():
-    """Endpoint para calcular precios aplicando rentabilidad"""
+    """Endpoint para calcular precios con el nuevo flujo simplificado"""
     global precios_data, rentabilidades_data
     
     try:
-        logger.info(f"=== CALCULAR PRECIOS CON RENTABILIDAD ===")
+        logger.info("🚀 Iniciando proceso de pricing simplificado...")
         
         # Verificar que tengamos ambos archivos
         if precios_data is None:
             return {
                 "status": "error",
-                "mensaje": "No hay archivo de precios cargado"
+                "mensaje": "❌ No hay archivo de precios cargado. Carga primero la lista de precios."
             }
         
         if rentabilidades_data is None:
             return {
                 "status": "error", 
-                "mensaje": "No hay archivo de rentabilidades cargado"
+                "mensaje": "❌ No hay archivo de rentabilidades cargado. Carga primero las reglas de rentabilidad."
             }
         
-        logger.info(f"Precios cargados: {list(precios_data.keys())}")
-        logger.info(f"Rentabilidades cargadas: {list(rentabilidades_data.keys())}")
-        
-        # Buscar hojas disponibles (más flexible)
+        # Buscar hojas disponibles
         hojas_precios = list(precios_data.keys())
         hojas_rentabilidad = list(rentabilidades_data.keys())
         
-        # Usar la primera hoja disponible o buscar coincidencias
+        # Buscar coincidencias por nombre (priorizar Moura)
         hoja_precios = None
         hoja_rentabilidad = None
         
-        # Buscar coincidencias por nombre
+        # Buscar Moura primero
         for hoja_precio in hojas_precios:
-            for hoja_rent in hojas_rentabilidad:
-                if hoja_precio.lower() == hoja_rent.lower():
-                    hoja_precios = hoja_precio
-                    hoja_rentabilidad = hoja_rent
+            if 'moura' in hoja_precio.lower():
+                for hoja_rent in hojas_rentabilidad:
+                    if 'moura' in hoja_rent.lower():
+                        hoja_precios = hoja_precio
+                        hoja_rentabilidad = hoja_rent
+                        break
+                if hoja_precios:
                     break
-            if hoja_precios:
-                break
         
-        # Si no hay coincidencias, usar las primeras hojas disponibles
+        # Si no hay Moura, usar las primeras hojas disponibles
         if not hoja_precios:
             hoja_precios = hojas_precios[0] if hojas_precios else None
             hoja_rentabilidad = hojas_rentabilidad[0] if hojas_rentabilidad else None
@@ -967,21 +965,57 @@ async def calcular_precios_con_rentabilidad():
         logger.info(f"Productos en precios: {len(precios_hoja)}")
         logger.info(f"Reglas en rentabilidad: {len(rentabilidad_hoja)}")
         
-        # Mostrar columnas disponibles para debugging
-        if len(precios_hoja) > 0:
-            logger.info(f"Columnas en precios: {list(precios_hoja[0].keys())}")
-            # Mostrar primer producto para debugging
-            primer_producto = precios_hoja[0]
-            logger.info(f"Primer producto: {primer_producto}")
-        if len(rentabilidad_hoja) > 0:
-            logger.info(f"Columnas en rentabilidad: {list(rentabilidad_hoja[0].keys())}")
-            # Mostrar primera regla para debugging
-            primera_regla = rentabilidad_hoja[0]
-            logger.info(f"Primera regla: {primera_regla}")
+        # Convertir datos a productos
+        productos = []
+        for item in precios_hoja:
+            try:
+                producto = Producto(
+                    codigo=str(item.get('codigo', '')),
+                    nombre=str(item.get('nombre', '')),
+                    marca=Marca.MOURA,  # Por ahora solo Moura
+                    canal=Canal.MINORISTA,  # Por defecto minorista
+                    categoria='Baterías',
+                    precio_base=float(item.get('precio', 0)),
+                    precio_final=0,
+                    margen=0,
+                    markup_aplicado=0,
+                    estado_rentabilidad='',
+                    margen_minimo_esperado=0,
+                    margen_optimo_esperado=0,
+                    alertas=[],
+                    sugerencias_openai=''
+                )
+                productos.append(producto)
+            except Exception as e:
+                logger.error(f"Error convirtiendo producto: {e}")
+                continue
         
-        # IMPLEMENTAR LÓGICA DE CÁLCULO
-        productos_calculados = []
-        alertas_generadas = 0
+        # Cargar rentabilidades en la lógica
+        pricing_logic.cargar_rentabilidades("data/Rentabilidades.xlsx")
+        
+        # Procesar productos con nueva lógica
+        resultado = pricing_logic.procesar_productos(productos)
+        
+        if 'error' in resultado:
+            logger.error(f"❌ Error en proceso: {resultado['error']}")
+            return {
+                "status": "error",
+                "mensaje": resultado['error']
+            }
+        
+        # Actualizar datos globales
+        global productos_globales
+        productos_globales = resultado['productos']
+        
+        logger.info(f"✅ Proceso completado exitosamente - {len(resultado['productos'])} productos")
+        
+        return {
+            "status": "success",
+            "mensaje": f"Proceso completado exitosamente para {len(resultado['productos'])} productos",
+            "productos": len(resultado['productos']),
+            "pasos_completados": resultado['pasos_completados'],
+            "resumen": resultado['resumen']
+        }
         
         for producto in precios_hoja:
             try:
