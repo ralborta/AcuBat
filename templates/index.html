@@ -906,24 +906,55 @@
             html += '<div class="card-body">';
             html += '<div class="timeline">';
             
-            pasos.forEach(paso => {
-                const iconClass = paso.estado.includes('✅') ? 'fas fa-check-circle text-success' : 
-                                 paso.estado.includes('⚠️') ? 'fas fa-exclamation-triangle text-warning' : 
-                                 'fas fa-times-circle text-danger';
-                
-                html += '<div class="timeline-item mb-3">';
-                html += '<div class="row">';
-                html += '<div class="col-md-1">';
-                html += `<i class="${iconClass} fa-2x"></i>`;
-                html += '</div>';
-                html += '<div class="col-md-11">';
-                html += `<h6 class="mb-1">Paso ${paso.paso}: ${paso.descripcion}</h6>`;
-                html += `<p class="text-muted mb-1">${paso.estado}</p>`;
-                html += `<small class="text-info">${paso.detalles}</small>`;
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
-            });
+            // Verificar si pasos es un array de strings o de objetos
+            if (pasos && Array.isArray(pasos)) {
+                pasos.forEach((paso, index) => {
+                    let iconClass = 'fas fa-check-circle text-success';
+                    let descripcion = '';
+                    let estado = '';
+                    let detalles = '';
+                    
+                    // Si es un string simple
+                    if (typeof paso === 'string') {
+                        descripcion = paso;
+                        estado = paso;
+                        detalles = 'Completado';
+                        if (paso.includes('✅')) {
+                            iconClass = 'fas fa-check-circle text-success';
+                        } else if (paso.includes('⚠️')) {
+                            iconClass = 'fas fa-exclamation-triangle text-warning';
+                        } else if (paso.includes('❌')) {
+                            iconClass = 'fas fa-times-circle text-danger';
+                        }
+                    } else {
+                        // Si es un objeto
+                        descripcion = paso.descripcion || paso.estado || 'Paso completado';
+                        estado = paso.estado || 'Completado';
+                        detalles = paso.detalles || 'Proceso exitoso';
+                        
+                        if (estado.includes('✅')) {
+                            iconClass = 'fas fa-check-circle text-success';
+                        } else if (estado.includes('⚠️')) {
+                            iconClass = 'fas fa-exclamation-triangle text-warning';
+                        } else if (estado.includes('❌')) {
+                            iconClass = 'fas fa-times-circle text-danger';
+                        }
+                    }
+                    
+                    html += '<div class="timeline-item mb-3">';
+                    html += '<div class="row">';
+                    html += '<div class="col-md-1">';
+                    html += `<i class="${iconClass} fa-2x"></i>`;
+                    html += '</div>';
+                    html += '<div class="col-md-11">';
+                    html += `<h6 class="mb-1">Paso ${index + 1}: ${descripcion}</h6>`;
+                    html += `<p class="text-muted mb-1">${estado}</p>`;
+                    html += `<small class="text-info">${detalles}</small>`;
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                });
+            }
             
             html += '</div>';
             html += '</div></div>';
@@ -935,18 +966,18 @@
                 html += '<div class="card">';
                 html += '<div class="card-header">📊 Resumen Final</div>';
                 html += '<div class="card-body">';
-                html += `<p><strong>Total Productos:</strong> ${resumen.total_productos}</p>`;
-                html += `<p><strong>Con Alertas:</strong> ${resumen.con_alertas}</p>`;
-                html += `<p><strong>Margen Promedio:</strong> ${resumen.margen_promedio}%</p>`;
+                html += `<p><strong>Total Productos:</strong> ${resumen.total_productos || 0}</p>`;
+                html += `<p><strong>Con Alertas:</strong> ${resumen.con_alertas || 0}</p>`;
+                html += `<p><strong>Margen Promedio:</strong> ${resumen.margen_promedio ? resumen.margen_promedio.toFixed(1) : 0}%</p>`;
                 html += '</div></div></div>';
                 
                 html += '<div class="col-md-6">';
                 html += '<div class="card">';
                 html += '<div class="card-header">✅ Estado de Rentabilidad</div>';
                 html += '<div class="card-body">';
-                html += `<p><strong>OK:</strong> ${resumen.rentabilidad_ok}</p>`;
-                html += `<p><strong>Revisar:</strong> ${resumen.rentabilidad_revisar}</p>`;
-                html += `<p><strong>Ajustar:</strong> ${resumen.rentabilidad_ajustar}</p>`;
+                html += `<p><strong>OK:</strong> ${resumen.rentabilidad_ok || 0}</p>`;
+                html += `<p><strong>Revisar:</strong> ${resumen.rentabilidad_revisar || 0}</p>`;
+                html += `<p><strong>Ajustar:</strong> ${resumen.rentabilidad_ajustar || 0}</p>`;
                 html += '</div></div></div>';
                 html += '</div>';
             }
