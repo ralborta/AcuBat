@@ -1025,34 +1025,50 @@ async def calcular_precios_con_rentabilidad():
                 precio_base = 0
                 columna_precio_encontrada = None
                 
-                for col_precio in posibles_columnas_precio:
-                    if col_precio in producto:
+                # PRIMERA PRIORIDAD: Buscar columnas con símbolo de moneda ($)
+                for col, valor in producto.items():
+                    if isinstance(valor, str) and '$' in valor:
                         try:
-                            precio_temp = float(producto[col_precio])
-                            if precio_temp > 0:
+                            # Limpiar el valor de moneda
+                            precio_temp = float(valor.replace('$', '').replace('.', '').replace(',', '.').replace(' ', ''))
+                            if precio_temp > 100:  # Solo precios razonables (más de $100)
                                 precio_base = precio_temp
-                                columna_precio_encontrada = col_precio
-                                logger.info(f"Precio encontrado en columna '{col_precio}': {precio_base}")
+                                columna_precio_encontrada = col
+                                logger.info(f"Precio encontrado en columna con $ '{col}': {precio_base}")
                                 break
                         except (ValueError, TypeError):
                             continue
                 
-                # Si no se encuentra precio, intentar con cualquier columna que contenga números
+                # SEGUNDA PRIORIDAD: Buscar columnas con nombres específicos
+                if precio_base == 0:
+                    for col_precio in posibles_columnas_precio:
+                        if col_precio in producto:
+                            try:
+                                precio_temp = float(producto[col_precio])
+                                if precio_temp > 0:
+                                    precio_base = precio_temp
+                                    columna_precio_encontrada = col_precio
+                                    logger.info(f"Precio encontrado en columna '{col_precio}': {precio_base}")
+                                    break
+                            except (ValueError, TypeError):
+                                continue
+                
+                # TERCERA PRIORIDAD: Buscar columnas con valores numéricos altos (más de $100)
                 if precio_base == 0:
                     for col, valor in producto.items():
-                        if isinstance(valor, (int, float)) and valor > 0:
+                        if isinstance(valor, (int, float)) and valor > 100:
                             precio_base = float(valor)
                             columna_precio_encontrada = col
-                            logger.info(f"Precio encontrado en columna numérica '{col}': {precio_base}")
+                            logger.info(f"Precio encontrado en columna numérica alta '{col}': {precio_base}")
                             break
                         elif isinstance(valor, str):
                             try:
                                 # Intentar convertir string a número
-                                precio_temp = float(valor.replace('$', '').replace(',', '').replace(' ', ''))
-                                if precio_temp > 0:
+                                precio_temp = float(valor.replace('$', '').replace('.', '').replace(',', '.').replace(' ', ''))
+                                if precio_temp > 100:  # Solo precios razonables
                                     precio_base = precio_temp
                                     columna_precio_encontrada = col
-                                    logger.info(f"Precio encontrado en columna string '{col}': {precio_base}")
+                                    logger.info(f"Precio encontrado en columna string alta '{col}': {precio_base}")
                                     break
                             except (ValueError, TypeError):
                                 continue
@@ -1093,9 +1109,28 @@ async def calcular_precios_con_rentabilidad():
                     alertas_generadas += 1
                 
                 # Crear producto calculado
+                # Buscar código en la primera columna (generalmente es la columna 0)
+                codigo = 'N/A'
+                nombre = 'N/A'
+                
+                # Buscar código (primera columna o columna con códigos alfanuméricos)
+                for col, valor in producto.items():
+                    if isinstance(valor, str) and len(valor) > 0:
+                        # Buscar códigos como M40FD, M18FD, etc.
+                        if any(char.isalpha() for char in valor) and any(char.isdigit() for char in valor):
+                            codigo = valor
+                            break
+                
+                # Buscar nombre (columna con descripciones largas)
+                for col, valor in producto.items():
+                    if isinstance(valor, str) and len(valor) > 20:  # Descripciones largas
+                        if ',' in valor or ';' in valor:  # Típico de descripciones de productos
+                            nombre = valor
+                            break
+                
                 producto_calculado = {
-                    'codigo': producto.get('codigo', producto.get('producto', producto.get('sku', producto.get('id', 'N/A')))),
-                    'nombre': producto.get('nombre', producto.get('descripcion', producto.get('producto', producto.get('desc', 'N/A')))),
+                    'codigo': codigo,
+                    'nombre': nombre,
                     'marca': producto.get('marca', producto.get('brand', 'N/A')),
                     'canal': producto.get('canal', producto.get('channel', 'N/A')),
                     'linea': producto.get('linea', producto.get('line', producto.get('categoria', 'N/A'))),
