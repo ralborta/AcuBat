@@ -895,8 +895,14 @@ async def calcular_precios_con_rentabilidad():
         # Mostrar columnas disponibles para debugging
         if len(precios_hoja) > 0:
             logger.info(f"Columnas en precios: {list(precios_hoja[0].keys())}")
+            # Mostrar primer producto para debugging
+            primer_producto = precios_hoja[0]
+            logger.info(f"Primer producto: {primer_producto}")
         if len(rentabilidad_hoja) > 0:
             logger.info(f"Columnas en rentabilidad: {list(rentabilidad_hoja[0].keys())}")
+            # Mostrar primera regla para debugging
+            primera_regla = rentabilidad_hoja[0]
+            logger.info(f"Primera regla: {primera_regla}")
         
         # IMPLEMENTAR LÓGICA DE CÁLCULO
         productos_calculados = []
@@ -935,15 +941,65 @@ async def calcular_precios_con_rentabilidad():
                     regla_encontrada = rentabilidad_hoja[0]  # Usar primera regla como default
                 
                 # Calcular precio con margen
-                precio_base = float(producto.get('precio', 0))
+                # Buscar columna de precio con diferentes nombres posibles
+                posibles_columnas_precio = ['precio', 'price', 'valor', 'costo', 'cost', 'precio_base', 'precio_lista']
+                precio_base = 0
+                
+                for col_precio in posibles_columnas_precio:
+                    if col_precio in producto:
+                        try:
+                            precio_base = float(producto[col_precio])
+                            logger.info(f"Precio encontrado en columna '{col_precio}': {precio_base}")
+                            break
+                        except (ValueError, TypeError):
+                            continue
+                
+                # Si no se encuentra precio, intentar con cualquier columna que contenga números
+                if precio_base == 0:
+                    for col, valor in producto.items():
+                        if isinstance(valor, (int, float)) and valor > 0:
+                            precio_base = float(valor)
+                            logger.info(f"Precio encontrado en columna numérica '{col}': {precio_base}")
+                            break
+                        elif isinstance(valor, str):
+                            try:
+                                # Intentar convertir string a número
+                                precio_temp = float(valor.replace('$', '').replace(',', ''))
+                                if precio_temp > 0:
+                                    precio_base = precio_temp
+                                    logger.info(f"Precio encontrado en columna string '{col}': {precio_base}")
+                                    break
+                            except (ValueError, TypeError):
+                                continue
+                
+                # Validar que el precio base sea válido
+                if precio_base <= 0:
+                    # Agregar producto con error de precio
+                    productos_calculados.append({
+                        'codigo': producto.get('codigo', producto.get('producto', 'N/A')),
+                        'nombre': producto.get('nombre', producto.get('descripcion', 'N/A')),
+                        'marca': producto.get('marca', 'N/A'),
+                        'canal': producto.get('canal', 'N/A'),
+                        'linea': producto.get('linea', 'N/A'),
+                        'precio_base': precio_base,
+                        'precio_final': 0,
+                        'margen_aplicado': 0,
+                        'margen_real': 0,
+                        'margen_minimo': 0,
+                        'regla_usada': 'N/A',
+                        'alertas': ['Precio base inválido o cero'],
+                        'estado': 'Error'
+                    })
+                    continue
+                
                 margen_minimo = float(regla_encontrada.get('margen_minimo', 20)) if regla_encontrada else 20
                 margen_optimo = float(regla_encontrada.get('margen_optimo', 35)) if regla_encontrada else 35
                 
                 # Aplicar margen óptimo
                 precio_final = precio_base * (1 + margen_optimo / 100)
                 
-                # Calcular margen real
-                margen_real = ((precio_final - precio_base) / precio_base) * 100
+                # Calcular margen real (evitar división por cero)
+                margen_real = ((precio_final - precio_base) / precio_base) * 100 if precio_base > 0 else 0
                 
                 # Generar alertas
                 alertas = []
