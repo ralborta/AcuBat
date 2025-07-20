@@ -581,7 +581,7 @@
                 html += `<p><strong>✅ OK:</strong> ${data.estadisticas.productos_ok}</p>`;
                 html += `<p><strong>⚠️ Revisar:</strong> ${data.estadisticas.productos_revisar}</p>`;
                 html += `<p><strong>❌ Error:</strong> ${data.estadisticas.productos_error}</p>`;
-                html += `<p><strong>🚨 Alertas:</strong> ${data.estadisticas.alertas_generadas}</p>`;
+                html += `<p><strong>🚨 Alertas:</strong> ${data.estadisticas.alertas_generadas || 0}</p>`;
             }
             html += '</div></div></div>';
             html += '</div>';
@@ -619,7 +619,7 @@
                     html += `<td>$${producto.precio_final.toFixed(2)}</td>`;
                     html += `<td>${producto.margen_real}%</td>`;
                     html += `<td><span class="badge bg-${estadoClass}"><i class="fas fa-${estadoIcon}"></i> ${producto.estado}</span></td>`;
-                    html += `<td>${producto.alertas && producto.alertas.length > 0 ? producto.alertas.join(', ') : '-'}</td>`;
+                    html += `<td>${producto.alertas && Array.isArray(producto.alertas) && producto.alertas.length > 0 ? producto.alertas.join(', ') : '-'}</td>`;
                     html += '</tr>';
                 });
                 
