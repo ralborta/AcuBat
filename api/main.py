@@ -347,134 +347,67 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/cargar-rentabilidades")
 async def upload_rentabilidades(file: UploadFile = File(...)):
-    """Endpoint para subir archivo de precios/rentabilidades"""
+    """Endpoint SIMPLE para subir archivo de rentabilidades"""
     try:
-        logger.info(f"=== INICIO CARGAR ARCHIVO DE PRECIOS ===")
-        logger.info(f"Archivo recibido: {file.filename}")
-        logger.info(f"Content-Type: {file.content_type}")
+        logger.info(f"=== CARGA SIMPLE DE RENTABILIDADES ===")
+        logger.info(f"Archivo: {file.filename}")
         
-        # Verificar que sea un archivo Excel
+        # Verificar que sea Excel
         if not file.filename.endswith(('.xlsx', '.xls')):
-            raise HTTPException(status_code=400, detail=f"Tipo de archivo no soportado: {file.filename}. Solo se permiten archivos Excel (.xlsx, .xls)")
+            return {
+                "status": "error",
+                "mensaje": "Solo archivos Excel (.xlsx, .xls)"
+            }
         
-        # Leer el archivo
+        # Leer archivo
         contenido = file.file.read()
-        logger.info(f"Contenido leído: {len(contenido)} bytes")
+        logger.info(f"Tamaño: {len(contenido)} bytes")
         
-        if not contenido:
-            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        if len(contenido) == 0:
+            return {
+                "status": "error", 
+                "mensaje": "Archivo vacío"
+            }
         
-        # Guardar archivo temporalmente
+        # Guardar temporalmente
         import tempfile
+        import os
         
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
             temp_file.write(contenido)
             temp_file_path = temp_file.name
         
-        logger.info(f"Archivo temporal creado: {temp_file_path}")
-        
         try:
-            # Leer el archivo Excel para diagnosticar
+            # Solo verificar que se puede leer
             import pandas as pd
-            
-            # Leer todas las hojas
             excel_file = pd.ExcelFile(temp_file_path)
-            logger.info(f"Archivo Excel con {len(excel_file.sheet_names)} hojas: {excel_file.sheet_names}")
             
-            # Buscar específicamente la hoja "Moura"
-            hoja_moura = None
-            for sheet_name in excel_file.sheet_names:
-                if 'moura' in sheet_name.lower():
-                    hoja_moura = sheet_name
-                    break
-            
-            if not hoja_moura:
-                logger.error(f"No se encontró hoja 'Moura' en el archivo. Hojas disponibles: {excel_file.sheet_names}")
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"No se encontró hoja 'Moura' en el archivo. Hojas disponibles: {excel_file.sheet_names}"
-                )
-            
-            logger.info(f"=== PROCESANDO HOJA: {hoja_moura} ===")
-            
-            # Leer la hoja Moura
-            df = pd.read_excel(temp_file_path, sheet_name=hoja_moura)
-            logger.info(f"Columnas en hoja '{hoja_moura}': {list(df.columns)}")
-            logger.info(f"Primeras 3 filas de '{hoja_moura}':")
-            logger.info(df.head(3).to_string())
-            
-            # Verificar si tiene las columnas requeridas para archivo de precios
-            columnas_requeridas_precios = ['rentabilidad', 'mark-up', 'markup']
-            columnas_encontradas = []
-            columnas_faltantes = []
-            
-            for col in df.columns:
-                col_lower = str(col).lower().strip()
-                if any(req in col_lower for req in ['rentabilidad', 'rent']):
-                    columnas_encontradas.append('rentabilidad')
-                elif any(req in col_lower for req in ['mark-up', 'markup', 'mark up']):
-                    columnas_encontradas.append('mark-up')
-            
-            # Verificar columnas faltantes
-            for req in columnas_requeridas_precios:
-                if req not in columnas_encontradas:
-                    columnas_faltantes.append(req)
-            
-            logger.info(f"Columnas de precios encontradas en '{hoja_moura}': {columnas_encontradas}")
-            logger.info(f"Columnas faltantes: {columnas_faltantes}")
-            
-            # Si no tiene las columnas de precios, verificar si tiene productos y precios
-            if not columnas_encontradas:
-                # Buscar columnas con productos y precios
-                tiene_productos = False
-                tiene_precios = False
-                
-                for col in df.columns:
-                    col_lower = str(col).lower().strip()
-                    # Buscar columna con códigos de productos
-                    if any(palabra in col_lower for palabra in ['producto', 'codigo', 'item', 'sku']):
-                        tiene_productos = True
-                    # Buscar columna con precios
-                    if any(palabra in col_lower for palabra in ['precio', 'costo', 'valor', '$']):
-                        tiene_precios = True
-                
-                if tiene_productos and tiene_precios:
-                    logger.info(f"✅ Hoja '{hoja_moura}' válida como archivo de precios con productos y precios")
-                    columnas_encontradas = ['productos_y_precios']
-                else:
-                    raise HTTPException(
-                        status_code=400, 
-                        detail=f"La hoja '{hoja_moura}' no contiene columnas de rentabilidad/mark-up ni productos y precios válidos"
-                    )
-            else:
-                logger.info(f"✅ Hoja '{hoja_moura}' válida con columnas de rentabilidad/mark-up")
-            
-            # Si llegamos aquí, la hoja es válida
-            logger.info(f"✅ Hoja '{hoja_moura}' válida con {len(df)} filas")
+            logger.info(f"✅ Archivo válido con {len(excel_file.sheet_names)} hojas")
             
             return {
-                "mensaje": f"Archivo de precios analizado: {file.filename} - Hoja '{hoja_moura}' válida con {len(df)} filas",
-                "hoja_procesada": hoja_moura,
-                "filas_encontradas": len(df),
-                "columnas_encontradas": columnas_encontradas,
-                "tipo_archivo": "precios",
-                "archivo_original": file.filename,
-                "tamaño_archivo": len(contenido),
-                "status": "exito"
+                "status": "success",
+                "mensaje": f"Archivo cargado exitosamente: {file.filename}",
+                "hojas": excel_file.sheet_names,
+                "total_hojas": len(excel_file.sheet_names),
+                "tamaño": len(contenido)
             }
             
+        except Exception as e:
+            logger.error(f"Error leyendo Excel: {str(e)}")
+            return {
+                "status": "error",
+                "mensaje": f"Error al leer archivo Excel: {str(e)}"
+            }
         finally:
-            # Limpiar archivo temporal
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
-                logger.info(f"Archivo temporal eliminado: {temp_file_path}")
         
     except Exception as e:
-        logger.error(f"Error inesperado en cargar-rentabilidades: {str(e)}")
-        logger.error(f"Tipo de error: {type(e).__name__}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error al cargar archivo de precios: {str(e)}")
+        logger.error(f"Error general: {str(e)}")
+        return {
+            "status": "error",
+            "mensaje": f"Error: {str(e)}"
+        }
 
 @app.post("/diagnostico-excel")
 async def diagnostico_excel(file: UploadFile = File(...)):
