@@ -763,6 +763,25 @@ async def verificar_rentabilidades():
         "total_hojas": len(rentabilidades_data)
     }
 
+@app.get("/api/estado-archivos")
+async def obtener_estado_archivos():
+    """Obtiene el estado actual de los archivos cargados"""
+    global precios_data, rentabilidades_data
+    
+    try:
+        return {
+            "precios_cargados": precios_data is not None,
+            "rentabilidades_cargadas": rentabilidades_data is not None,
+            "listo_para_procesar": precios_data is not None and rentabilidades_data is not None
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo estado de archivos: {e}")
+        return {
+            "precios_cargados": False,
+            "rentabilidades_cargadas": False,
+            "listo_para_procesar": False
+        }
+
 @app.get("/export/csv")
 async def export_csv():
     """Exportar productos a CSV"""

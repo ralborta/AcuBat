@@ -313,6 +313,86 @@
             margin-top: 2rem;
         }
 
+        .process-timeline {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .process-step {
+            display: flex;
+            align-items: center;
+            position: relative;
+            width: 20%; /* Adjust as needed */
+            text-align: center;
+        }
+
+        .process-step::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background-color: #e0e0e0;
+        }
+
+        .process-step:first-child::before {
+            width: 0; /* Hide line before the first step */
+        }
+
+        .process-step:last-child::before {
+            width: 0; /* Hide line after the last step */
+        }
+
+        .process-step.active {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .process-step.active .step-icon i {
+            color: var(--primary-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        .process-step.completed .step-icon i {
+            color: var(--success-color);
+        }
+
+        .step-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #f0f9ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px auto;
+            border: 2px solid #e0e0e0;
+        }
+
+        .step-icon i {
+            font-size: 24px;
+        }
+
+        .step-content h6 {
+            margin-bottom: 5px;
+            color: var(--dark-color);
+        }
+
+        .step-content p {
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.7; }
+        }
+
         @media (max-width: 768px) {
             .content-sections {
                 grid-template-columns: 1fr;
@@ -409,6 +489,23 @@
             </div>
         </div>
 
+        <!-- Estado de Archivos -->
+        <div class="actions-section" style="margin-bottom: 1.5rem;">
+            <h3 class="actions-title">Estado de Archivos</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <div id="estadoPrecios" class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> No hay archivo de precios cargado
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div id="estadoRentabilidades" class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> No hay archivo de rentabilidades cargado
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Actions Section -->
         <div class="actions-section">
             <h3 class="actions-title">Calcular Precios con Rentabilidad</h3>
@@ -451,6 +548,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupUploadZones();
             verificarEstado();
+            actualizarEstadoArchivos();
         });
 
         function setupUploadZones() {
@@ -512,12 +610,142 @@
         }
 
         function mostrarCarga(mensaje) {
-            document.getElementById('loadingSpinner').style.display = 'flex';
-            document.getElementById('loadingMessage').textContent = mensaje;
+            const loadingDiv = document.getElementById('loadingSpinner');
+            const loadingText = document.getElementById('loadingMessage');
+            loadingText.textContent = mensaje;
+            loadingDiv.style.display = 'flex';
         }
 
         function ocultarCarga() {
-            document.getElementById('loadingSpinner').style.display = 'none';
+            const loadingDiv = document.getElementById('loadingSpinner');
+            loadingDiv.style.display = 'none';
+        }
+
+        function mostrarProcesoPasoAPaso() {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = '<h4><i class="fas fa-cogs fa-spin"></i> Procesando Pricing...</h4>';
+            html += '<div class="process-timeline">';
+            
+            // Paso 1: Validación
+            html += '<div class="process-step active" id="step1">';
+            html += '<div class="step-icon"><i class="fas fa-check-circle fa-spin"></i></div>';
+            html += '<div class="step-content">';
+            html += '<h6>Paso 1: Validando códigos</h6>';
+            html += '<p class="text-muted">Verificando consistencia...</p>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Paso 2: Relevamiento
+            html += '<div class="process-step" id="step2">';
+            html += '<div class="step-icon"><i class="fas fa-search fa-spin"></i></div>';
+            html += '<div class="step-content">';
+            html += '<h6>Paso 2: Relevamiento mercado</h6>';
+            html += '<p class="text-muted">Analizando competencia...</p>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Paso 3: Markups
+            html += '<div class="process-step" id="step3">';
+            html += '<div class="step-icon"><i class="fas fa-percentage fa-spin"></i></div>';
+            html += '<div class="step-content">';
+            html += '<h6>Paso 3: Aplicando markups</h6>';
+            html += '<p class="text-muted">Calculando precios...</p>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Paso 4: Redondeo
+            html += '<div class="process-step" id="step4">';
+            html += '<div class="step-icon"><i class="fas fa-calculator fa-spin"></i></div>';
+            html += '<div class="step-content">';
+            html += '<h6>Paso 4: Aplicando redondeo</h6>';
+            html += '<p class="text-muted">Redondeando precios...</p>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Paso 5: Márgenes
+            html += '<div class="process-step" id="step5">';
+            html += '<div class="step-icon"><i class="fas fa-chart-line fa-spin"></i></div>';
+            html += '<div class="step-content">';
+            html += '<h6>Paso 5: Calculando márgenes</h6>';
+            html += '<p class="text-muted">Determinando rentabilidad...</p>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Paso 6: Validación IA
+            html += '<div class="process-step" id="step6">';
+            html += '<div class="step-icon"><i class="fas fa-robot fa-spin"></i></div>';
+            html += '<div class="step-content">';
+            html += '<h6>Paso 6: Análisis con IA</h6>';
+            html += '<p class="text-muted">OpenAI analizando...</p>';
+            html += '</div>';
+            html += '</div>';
+            
+            html += '</div>';
+            
+            resultsContent.innerHTML = html;
+            resultsSection.style.display = 'block';
+            
+            // Simular progreso
+            simularProgreso();
+        }
+
+        function simularProgreso() {
+            const steps = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
+            let currentStep = 0;
+            
+            const interval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    // Completar paso anterior
+                    if (currentStep > 0) {
+                        const prevStep = document.getElementById(steps[currentStep - 1]);
+                        const prevIcon = prevStep.querySelector('.step-icon i');
+                        prevIcon.className = 'fas fa-check-circle text-success';
+                        prevStep.classList.remove('active');
+                        prevStep.classList.add('completed');
+                    }
+                    
+                    // Activar paso actual
+                    if (currentStep < steps.length) {
+                        const currentStepEl = document.getElementById(steps[currentStep]);
+                        currentStepEl.classList.add('active');
+                    }
+                    
+                    currentStep++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 1000); // 1 segundo por paso
+        }
+
+        function actualizarEstadoArchivos() {
+            const estadoPrecios = document.getElementById('estadoPrecios');
+            const estadoRentabilidades = document.getElementById('estadoRentabilidades');
+            
+            // Verificar estado actual
+            fetch('/api/estado-archivos')
+            .then(response => response.json())
+            .then(data => {
+                if (data.precios_cargados) {
+                    estadoPrecios.innerHTML = '<i class="fas fa-check-circle text-success"></i> Archivo de precios cargado';
+                    estadoPrecios.className = 'alert alert-success';
+                } else {
+                    estadoPrecios.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> No hay archivo de precios';
+                    estadoPrecios.className = 'alert alert-warning';
+                }
+                
+                if (data.rentabilidades_cargadas) {
+                    estadoRentabilidades.innerHTML = '<i class="fas fa-check-circle text-success"></i> Archivo de rentabilidades cargado';
+                    estadoRentabilidades.className = 'alert alert-warning';
+                } else {
+                    estadoRentabilidades.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> No hay archivo de rentabilidades';
+                    estadoRentabilidades.className = 'alert alert-warning';
+                }
+            })
+            .catch(error => {
+                console.error('Error verificando estado:', error);
+            });
         }
 
         function mostrarAlerta(tipo, mensaje, elementoId) {
@@ -554,6 +782,7 @@
                     mostrarAlerta('success', `✅ ${data.mensaje}`, 'preciosStatus');
                     actualizarEstadisticas();
                     actualizarPasos();
+                    actualizarEstadoArchivos();
                 } else {
                     mostrarAlerta('danger', `❌ ${data.mensaje}`, 'preciosStatus');
                 }
@@ -583,6 +812,7 @@
                     mostrarAlerta('success', `✅ ${data.mensaje}`, 'rentabilidadesStatus');
                     actualizarEstadisticas();
                     actualizarPasos();
+                    actualizarEstadoArchivos();
                 } else {
                     mostrarAlerta('danger', `❌ ${data.mensaje}`, 'rentabilidadesStatus');
                 }
@@ -600,27 +830,33 @@
                 return;
             }
 
-            mostrarCarga('Calculando precios con rentabilidad...');
+            // Mostrar proceso paso a paso
+            mostrarProcesoPasoAPaso();
             
-            fetch('/calcular-precios-con-rentabilidad', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                ocultarCarga();
-                if (data.status === 'success') {
-                    mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
-                    mostrarPasosCompletados(data.pasos_completados, data.resumen);
-                    document.getElementById('totalCalculados').textContent = data.productos || '0';
-                } else {
-                    mostrarAlerta('danger', `❌ ${data.mensaje}`, 'calculoStatus');
-                }
-            })
-            .catch(error => {
-                ocultarCarga();
-                mostrarAlerta('danger', '❌ Error al calcular precios', 'calculoStatus');
-                console.error('Error:', error);
-            });
+            // Simular tiempo de procesamiento
+            setTimeout(() => {
+                mostrarCarga('🚀 Iniciando proceso de pricing...');
+                
+                fetch('/calcular-precios-con-rentabilidad', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    ocultarCarga();
+                    if (data.status === 'success') {
+                        mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
+                        mostrarPasosCompletados(data.pasos_completados, data.resumen);
+                        document.getElementById('totalCalculados').textContent = data.productos || '0';
+                    } else {
+                        mostrarAlerta('danger', `❌ ${data.mensaje}`, 'calculoStatus');
+                    }
+                })
+                .catch(error => {
+                    ocultarCarga();
+                    mostrarAlerta('danger', '❌ Error al calcular precios', 'calculoStatus');
+                    console.error('Error:', error);
+                });
+            }, 2000); // Esperar 2 segundos para mostrar el proceso
         }
 
         function mostrarPasosCompletados(pasos, resumen) {
