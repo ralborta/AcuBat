@@ -251,9 +251,41 @@
         }
 
         .stat-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-color);
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-number.productos {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.precios {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.rentabilidad {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-number.calculados {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .stat-label {
@@ -268,7 +300,7 @@
     <div class="main-container">
         <!-- Header -->
         <div class="header">
-            <h1><i class="fas fa-rocket"></i> AcuBat</h1>
+            <h1><i class="fas fa-brain"></i> AcuBat</h1>
             <p>Sistema de Pricing Inteligente</p>
         </div>
 
@@ -277,19 +309,19 @@
             <!-- Stats Grid -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number" id="totalProductos">0</div>
+                    <div class="stat-number productos" id="totalProductos">0</div>
                     <div class="stat-label">Productos</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="totalPrecios">0</div>
+                    <div class="stat-number precios" id="totalPrecios">0</div>
                     <div class="stat-label">Precios Cargados</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="totalRentabilidad">0</div>
+                    <div class="stat-number rentabilidad" id="totalRentabilidad">0</div>
                     <div class="stat-label">Reglas de Rentabilidad</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="totalCalculados">0</div>
+                    <div class="stat-number calculados" id="totalCalculados">0</div>
                     <div class="stat-label">Precios Calculados</div>
                 </div>
             </div>
