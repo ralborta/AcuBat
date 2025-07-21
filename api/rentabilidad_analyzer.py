@@ -383,39 +383,120 @@ def analizar_rentabilidades_2_canales(file_path: str) -> Dict[str, Any]:
 def _detectar_secciones_canales(df: pd.DataFrame, hoja_nombre: str) -> Dict[str, Dict]:
     """
     Detecta las secciones de Minorista (izquierda) y Mayorista (derecha) en la hoja.
+    Mejorada para detectar la estructura específica de Rentalibilidades-2.xlsx
     """
     secciones = {}
     
-    # Buscar títulos de secciones
-    for i in range(len(df)):
-        for j in range(len(df.columns)):
-            valor = str(df.iloc[i, j]).strip().upper()
-            
-            # Detectar sección Minorista (P. Publico)
-            if 'PUBLICO' in valor or 'MINORISTA' in valor:
-                if 'IVA' in str(df.iloc[i, j+1]).upper() or 'INC' in str(df.iloc[i, j+1]).upper():
-                    secciones['minorista'] = {
-                        'fila_inicio': i,
-                        'columna_inicio': j,
-                        'titulo': valor
-                    }
-                    logger.info(f"📍 Sección Minorista detectada en fila {i}, columna {j}: {valor}")
-            
-            # Detectar sección Mayorista (P. Mayorista)
-            elif 'MAYORISTA' in valor:
-                if 'IVA' in str(df.iloc[i, j+1]).upper() or 'INC' in str(df.iloc[i, j+1]).upper():
-                    secciones['mayorista'] = {
-                        'fila_inicio': i,
-                        'columna_inicio': j,
-                        'titulo': valor
-                    }
-                    logger.info(f"📍 Sección Mayorista detectada en fila {i}, columna {j}: {valor}")
+    logger.info(f"🔍 Buscando secciones en hoja: {hoja_nombre}")
+    logger.info(f"📏 Dimensiones de la hoja: {df.shape}")
     
+    # Buscar títulos de secciones de manera más flexible
+    for i in range(min(len(df), 50)):  # Buscar en las primeras 50 filas
+        for j in range(min(len(df.columns), 50)):  # Buscar en las primeras 50 columnas
+            try:
+                valor = str(df.iloc[i, j]).strip().upper()
+                
+                # Detectar sección Minorista (P. Publico)
+                if 'PUBLICO' in valor or 'MINORISTA' in valor or 'PUBLIC' in valor:
+                    # Verificar si hay indicadores de IVA o INC en las celdas cercanas
+                    celdas_cercanas = []
+                    for di in range(-1, 2):
+                        for dj in range(-1, 2):
+                            if 0 <= i + di < len(df) and 0 <= j + dj < len(df.columns):
+                                celdas_cercanas.append(str(df.iloc[i + di, j + dj]).upper())
+                    
+                    if any('IVA' in celda or 'INC' in celda for celda in celdas_cercanas):
+                        secciones['minorista'] = {
+                            'fila_inicio': i,
+                            'columna_inicio': j,
+                            'titulo': valor
+                        }
+                        logger.info(f"📍 Sección Minorista detectada en fila {i}, columna {j}: {valor}")
+                        break
+                
+                # Detectar sección Mayorista (P. Mayorista)
+                elif 'MAYORISTA' in valor or 'WHOLESALE' in valor:
+                    # Verificar si hay indicadores de IVA o INC en las celdas cercanas
+                    celdas_cercanas = []
+                    for di in range(-1, 2):
+                        for dj in range(-1, 2):
+                            if 0 <= i + di < len(df) and 0 <= j + dj < len(df.columns):
+                                celdas_cercanas.append(str(df.iloc[i + di, j + dj]).upper())
+                    
+                    if any('IVA' in celda or 'INC' in celda for celda in celdas_cercanas):
+                        secciones['mayorista'] = {
+                            'fila_inicio': i,
+                            'columna_inicio': j,
+                            'titulo': valor
+                        }
+                        logger.info(f"📍 Sección Mayorista detectada en fila {i}, columna {j}: {valor}")
+                        break
+                        
+            except Exception as e:
+                continue
+    
+    # Si no se detectaron secciones, buscar por patrones más específicos
+    if not secciones:
+        logger.info("🔍 No se detectaron secciones por título, buscando por patrones...")
+        
+        # Buscar columnas que contengan "P. Publico" o "P. Mayorista"
+        for j, col_name in enumerate(df.columns):
+            col_str = str(col_name).upper()
+            if 'P. PUBLICO' in col_str or 'PUBLICO' in col_str:
+                secciones['minorista'] = {
+                    'fila_inicio': 0,
+                    'columna_inicio': j,
+                    'titulo': str(col_name)
+                }
+                logger.info(f"📍 Sección Minorista detectada por columna: {col_name}")
+                break
+            elif 'P. MAYORISTA' in col_str or 'MAYORISTA' in col_str:
+                secciones['mayorista'] = {
+                    'fila_inicio': 0,
+                    'columna_inicio': j,
+                    'titulo': str(col_name)
+                }
+                logger.info(f"📍 Sección Mayorista detectada por columna: {col_name}")
+                break
+    
+    # Si aún no se detectaron, buscar por valores en las primeras filas
+    if not secciones:
+        logger.info("🔍 Buscando por valores en las primeras filas...")
+        
+        # Buscar filas que contengan precios con formato de moneda
+        for i in range(min(len(df), 20)):
+            for j in range(len(df.columns)):
+                try:
+                    valor = str(df.iloc[i, j])
+                    if '$' in valor and any(c.isdigit() for c in valor):
+                        # Verificar si es una sección de precios
+                        if j < len(df.columns) // 2:  # Mitad izquierda = Minorista
+                            secciones['minorista'] = {
+                                'fila_inicio': i,
+                                'columna_inicio': j,
+                                'titulo': f'Precios detectados en fila {i}'
+                            }
+                            logger.info(f"📍 Sección Minorista detectada por precios en fila {i}, columna {j}")
+                        else:  # Mitad derecha = Mayorista
+                            secciones['mayorista'] = {
+                                'fila_inicio': i,
+                                'columna_inicio': j,
+                                'titulo': f'Precios detectados en fila {i}'
+                            }
+                            logger.info(f"📍 Sección Mayorista detectada por precios en fila {i}, columna {j}")
+                        break
+                except:
+                    continue
+            if secciones:
+                break
+    
+    logger.info(f"✅ Secciones detectadas: {list(secciones.keys())}")
     return secciones
 
 def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str) -> List[Dict]:
     """
     Extrae las reglas de la sección Minorista (P. Publico).
+    Mejorada para ser más flexible con diferentes estructuras.
     """
     reglas = []
     
@@ -423,32 +504,59 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
         fila_inicio = seccion['fila_inicio']
         col_inicio = seccion['columna_inicio']
         
+        logger.info(f"🔍 Extrayendo reglas Minorista desde fila {fila_inicio}, columna {col_inicio}")
+        
         # Buscar la fila con los headers de columnas (Mark-UP, Rentabilidad, etc.)
         fila_headers = None
-        for i in range(fila_inicio + 1, min(fila_inicio + 10, len(df))):
-            fila = df.iloc[i, col_inicio:col_inicio + 10]
+        for i in range(fila_inicio + 1, min(fila_inicio + 15, len(df))):
+            fila = df.iloc[i, col_inicio:col_inicio + 15]
             if any('MARK' in str(celda).upper() for celda in fila):
                 fila_headers = i
+                logger.info(f"✅ Headers encontrados en fila {i}")
                 break
         
         if fila_headers is None:
-            logger.warning("⚠️ No se encontraron headers en sección Minorista")
-            return reglas
+            logger.warning("⚠️ No se encontraron headers en sección Minorista, buscando por patrones...")
+            # Buscar por patrones de precios
+            for i in range(fila_inicio + 1, min(fila_inicio + 20, len(df))):
+                fila = df.iloc[i, col_inicio:col_inicio + 10]
+                if any('$' in str(celda) and any(c.isdigit() for c in str(celda)) for celda in fila):
+                    fila_headers = i - 1  # Usar la fila anterior como headers
+                    logger.info(f"✅ Headers inferidos en fila {fila_headers}")
+                    break
         
-        # Encontrar las columnas relevantes
-        headers = df.iloc[fila_headers, col_inicio:col_inicio + 10]
+        if fila_headers is None:
+            logger.warning("⚠️ No se pudieron encontrar headers, usando fila de inicio + 1")
+            fila_headers = fila_inicio + 1
+        
+        # Encontrar las columnas relevantes de manera más flexible
+        headers = df.iloc[fila_headers, col_inicio:col_inicio + 15]
         col_publico = None
         col_markup = None
         col_rentabilidad = None
         
         for j, header in enumerate(headers):
             header_str = str(header).upper()
-            if 'PUBLICO' in header_str:
+            if 'PUBLICO' in header_str or 'PUBLIC' in header_str:
                 col_publico = col_inicio + j
-            elif 'MARK' in header_str:
+                logger.info(f"📍 Columna Público encontrada: {header}")
+            elif 'MARK' in header_str and 'UP' in header_str:
                 col_markup = col_inicio + j
-            elif 'RENTABILIDAD' in header_str:
+                logger.info(f"📍 Columna Markup encontrada: {header}")
+            elif 'RENTABILIDAD' in header_str or 'RENTABIL' in header_str:
                 col_rentabilidad = col_inicio + j
+                logger.info(f"📍 Columna Rentabilidad encontrada: {header}")
+        
+        # Si no se encontraron columnas específicas, usar las primeras columnas
+        if col_publico is None:
+            col_publico = col_inicio
+            logger.info(f"📍 Usando primera columna como Público: {col_inicio}")
+        if col_markup is None:
+            col_markup = col_inicio + 2  # Tercera columna típicamente
+            logger.info(f"📍 Usando columna {col_inicio + 2} como Markup")
+        if col_rentabilidad is None:
+            col_rentabilidad = col_inicio + 3  # Cuarta columna típicamente
+            logger.info(f"📍 Usando columna {col_inicio + 3} como Rentabilidad")
         
         # Extraer datos de productos
         for i in range(fila_headers + 1, len(df)):
@@ -468,6 +576,7 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                         'fila': i
                     }
                     reglas.append(regla)
+                    logger.info(f"✅ Regla Minorista extraída: Precio=${regla['precio_publico']}, Markup={regla['markup']}%")
                     
             except Exception as e:
                 logger.warning(f"⚠️ Error procesando fila {i} en Minorista: {e}")
@@ -483,6 +592,7 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
 def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str) -> List[Dict]:
     """
     Extrae las reglas de la sección Mayorista (P. Mayorista).
+    Mejorada para ser más flexible con diferentes estructuras.
     """
     reglas = []
     
@@ -490,20 +600,33 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
         fila_inicio = seccion['fila_inicio']
         col_inicio = seccion['columna_inicio']
         
+        logger.info(f"🔍 Extrayendo reglas Mayorista desde fila {fila_inicio}, columna {col_inicio}")
+        
         # Buscar la fila con los headers de columnas (Mak-up, rentabili, etc.)
         fila_headers = None
-        for i in range(fila_inicio + 1, min(fila_inicio + 10, len(df))):
-            fila = df.iloc[i, col_inicio:col_inicio + 10]
+        for i in range(fila_inicio + 1, min(fila_inicio + 15, len(df))):
+            fila = df.iloc[i, col_inicio:col_inicio + 15]
             if any('MAK' in str(celda).upper() for celda in fila):
                 fila_headers = i
+                logger.info(f"✅ Headers encontrados en fila {i}")
                 break
         
         if fila_headers is None:
-            logger.warning("⚠️ No se encontraron headers en sección Mayorista")
-            return reglas
+            logger.warning("⚠️ No se encontraron headers en sección Mayorista, buscando por patrones...")
+            # Buscar por patrones de precios
+            for i in range(fila_inicio + 1, min(fila_inicio + 20, len(df))):
+                fila = df.iloc[i, col_inicio:col_inicio + 10]
+                if any('$' in str(celda) and any(c.isdigit() for c in str(celda)) for celda in fila):
+                    fila_headers = i - 1  # Usar la fila anterior como headers
+                    logger.info(f"✅ Headers inferidos en fila {fila_headers}")
+                    break
         
-        # Encontrar las columnas relevantes
-        headers = df.iloc[fila_headers, col_inicio:col_inicio + 10]
+        if fila_headers is None:
+            logger.warning("⚠️ No se pudieron encontrar headers, usando fila de inicio + 1")
+            fila_headers = fila_inicio + 1
+        
+        # Encontrar las columnas relevantes de manera más flexible
+        headers = df.iloc[fila_headers, col_inicio:col_inicio + 15]
         col_precio_base = None
         col_markup = None
         col_rentabilidad = None
@@ -512,10 +635,24 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
             header_str = str(header).upper()
             if 'MAK' in header_str and 'UP' in header_str:
                 col_markup = col_inicio + j
+                logger.info(f"📍 Columna Markup encontrada: {header}")
             elif 'RENTABIL' in header_str:
                 col_rentabilidad = col_inicio + j
+                logger.info(f"📍 Columna Rentabilidad encontrada: {header}")
             elif j == 0:  # Primera columna suele ser el precio base
                 col_precio_base = col_inicio + j
+                logger.info(f"📍 Usando primera columna como precio base: {header}")
+        
+        # Si no se encontraron columnas específicas, usar las primeras columnas
+        if col_precio_base is None:
+            col_precio_base = col_inicio
+            logger.info(f"📍 Usando primera columna como precio base: {col_inicio}")
+        if col_markup is None:
+            col_markup = col_inicio + 2  # Tercera columna típicamente
+            logger.info(f"📍 Usando columna {col_inicio + 2} como Markup")
+        if col_rentabilidad is None:
+            col_rentabilidad = col_inicio + 3  # Cuarta columna típicamente
+            logger.info(f"📍 Usando columna {col_inicio + 3} como Rentabilidad")
         
         # Extraer datos de productos
         for i in range(fila_headers + 1, len(df)):
@@ -535,6 +672,7 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                         'fila': i
                     }
                     reglas.append(regla)
+                    logger.info(f"✅ Regla Mayorista extraída: Precio=${regla['precio_base']}, Markup={regla['markup']}%")
                     
             except Exception as e:
                 logger.warning(f"⚠️ Error procesando fila {i} en Mayorista: {e}")
