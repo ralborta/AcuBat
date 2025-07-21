@@ -1175,3 +1175,50 @@ async def obtener_logs():
             "status": "error",
             "mensaje": f"Error obteniendo logs: {str(e)}"
         } 
+
+@app.get("/api/listar-archivos")
+async def listar_archivos():
+    """Lista todos los archivos disponibles en el directorio de trabajo"""
+    try:
+        # Obtener directorio actual
+        current_dir = os.getcwd()
+        
+        # Listar todos los archivos
+        archivos = []
+        for root, dirs, files in os.walk(current_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, current_dir)
+                
+                # Obtener información del archivo
+                try:
+                    file_size = os.path.getsize(file_path)
+                    archivos.append({
+                        "nombre": file,
+                        "ruta": relative_path,
+                        "tamaño": file_size,
+                        "tamaño_mb": round(file_size / (1024 * 1024), 2)
+                    })
+                except:
+                    archivos.append({
+                        "nombre": file,
+                        "ruta": relative_path,
+                        "tamaño": "error",
+                        "tamaño_mb": "error"
+                    })
+        
+        # Filtrar solo archivos Excel
+        archivos_excel = [f for f in archivos if f["nombre"].lower().endswith('.xlsx')]
+        
+        return {
+            "directorio_actual": current_dir,
+            "total_archivos": len(archivos),
+            "archivos_excel": archivos_excel,
+            "todos_los_archivos": archivos[:20]  # Solo los primeros 20 para no saturar
+        }
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "directorio_actual": os.getcwd() if os.getcwd() else "No disponible"
+        }
