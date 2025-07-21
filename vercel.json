@@ -4,6 +4,10 @@
     {
       "src": "api/main.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/main_v2.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -12,12 +16,16 @@
       "dest": "/api/main.py"
     },
     {
+      "src": "/test-rentabilidad",
+      "dest": "/api/main_v2.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/main.py"
     }
   ],
   "functions": {
-    "api/main.py": {
+    "api/**/*.py": {
       "runtime": "python3.9"
     }
   },
@@ -38,12 +46,6 @@
           "value": "0"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/main.py"
     }
   ]
 } 
