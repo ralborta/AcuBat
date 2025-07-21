@@ -522,6 +522,9 @@
                 <button class="btn btn-modern btn-secondary-modern" onclick="analizarPlanillaCompleja()" id="btnAnalizarCompleja">
                     <i class="fas fa-brain"></i> Analizar Planilla Compleja
                 </button>
+                <button class="btn btn-modern btn-info-modern" onclick="analizarRentabilidades2Canales()" id="btnAnalizarRentabilidades2Canales">
+                    <i class="fas fa-chart-line"></i> Analizar Rentabilidades 2 Canales
+                </button>
             </div>
             <div id="calculoStatus" style="display: none; margin-top: 1.5rem;"></div>
         </div>
@@ -897,7 +900,7 @@
                     ocultarCarga();
                     if (data.status === 'success') {
                         mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
-                        mostrarPasosCompletados(data.pasos_completados, data.resumen, data);
+                        mostrarPasosCompletados(data);
                         
                         const totalProductos = data.resumen?.total_productos || data.productos || '0';
                         console.log('📊 Total productos a mostrar:', totalProductos);
@@ -914,169 +917,143 @@
             }, 500);
         }
 
-        function mostrarPasosCompletados(pasos, resumen, data) {
-            const resultsSection = document.getElementById('resultsSection');
-            const resultsContent = document.getElementById('resultsContent');
+        function mostrarPasosCompletados(data) {
+            console.log("📊 Mostrando resultados completos:", data);
             
-            let html = '<h4><i class="fas fa-tasks"></i> Proceso de Pricing Completado</h4>';
+            const resultadosDiv = document.getElementById('resultsContent'); // Changed from resultsSection to resultsContent
             
-            // Mostrar pasos del proceso
-            html += '<div class="card mb-4">';
-            html += '<div class="card-header">📋 Pasos del Proceso</div>';
-            html += '<div class="card-body">';
-            html += '<div class="timeline">';
+            // Mostrar pasos completados
+            let pasosHTML = '<div class="card mb-3">';
+            pasosHTML += '<div class="card-header">📋 Pasos del Proceso</div>';
+            pasosHTML += '<div class="card-body">';
+            pasosHTML += '<ul class="list-group list-group-flush">';
             
-            // Verificar si pasos es un array de strings o de objetos
-            if (pasos && Array.isArray(pasos)) {
-                pasos.forEach((paso, index) => {
-                    let iconClass = 'fas fa-check-circle text-success';
-                    let descripcion = '';
-                    let estado = '';
-                    let detalles = '';
-                    
-                    // Si es un string simple
-                    if (typeof paso === 'string') {
-                        descripcion = paso;
-                        estado = paso;
-                        detalles = 'Completado';
-                        if (paso.includes('✅')) {
-                            iconClass = 'fas fa-check-circle text-success';
-                        } else if (paso.includes('⚠️')) {
-                            iconClass = 'fas fa-exclamation-triangle text-warning';
-                        } else if (paso.includes('❌')) {
-                            iconClass = 'fas fa-times-circle text-danger';
-                        }
-                    } else {
-                        // Si es un objeto
-                        descripcion = paso.descripcion || paso.estado || 'Paso completado';
-                        estado = paso.estado || 'Completado';
-                        detalles = paso.detalles || 'Proceso exitoso';
-                        
-                        if (estado.includes('✅')) {
-                            iconClass = 'fas fa-check-circle text-success';
-                        } else if (estado.includes('⚠️')) {
-                            iconClass = 'fas fa-exclamation-triangle text-warning';
-                        } else if (estado.includes('❌')) {
-                            iconClass = 'fas fa-times-circle text-danger';
-                        }
-                    }
-                    
-                    html += '<div class="timeline-item mb-3">';
-                    html += '<div class="row">';
-                    html += '<div class="col-md-1">';
-                    html += `<i class="${iconClass} fa-2x"></i>`;
-                    html += '</div>';
-                    html += '<div class="col-md-11">';
-                    html += `<h6 class="mb-1">Paso ${index + 1}: ${descripcion}</h6>`;
-                    html += `<p class="text-muted mb-1">${estado}</p>`;
-                    html += `<small class="text-info">${detalles}</small>`;
-                    html += '</div>';
-                    html += '</div>';
-                    html += '</div>';
-                });
-            }
+            data.pasos_completados.forEach(paso => {
+                pasosHTML += `<li class="list-group-item">${paso}</li>`;
+            });
             
-            html += '</div>';
-            html += '</div></div>';
+            pasosHTML += '</ul></div></div>';
             
-            // Mostrar resumen
-            console.log('🔍 Datos completos recibidos en mostrarPasosCompletados:', data);
-            console.log('📋 Productos detalle disponibles:', data.productos_detalle ? data.productos_detalle.length : 'No disponible');
-            if (resumen) {
-                html += '<div class="row mb-4">';
-                html += '<div class="col-md-6">';
-                html += '<div class="card">';
-                html += '<div class="card-header">📊 Resumen Final</div>';
-                html += '<div class="card-body">';
-                html += `<p><strong>Total Productos:</strong> ${resumen.total_productos || 0}</p>`;
-                html += `<p><strong>Con Alertas:</strong> ${resumen.con_alertas || 0}</p>`;
-                html += `<p><strong>Margen Promedio:</strong> ${resumen.margen_promedio ? resumen.margen_promedio.toFixed(1) : 0}%</p>`;
-                html += '</div></div></div>';
+            // Mostrar resumen con ambos canales
+            let resumenHTML = '<div class="card mb-3">';
+            resumenHTML += '<div class="card-header">📊 Resumen del Cálculo</div>';
+            resumenHTML += '<div class="card-body">';
+            resumenHTML += '<div class="row">';
+            
+            // Resumen general
+            resumenHTML += '<div class="col-md-4">';
+            resumenHTML += '<div class="text-center">';
+            resumenHTML += `<h4 class="text-primary">${data.resumen.total_productos}</h4>`;
+            resumenHTML += '<p class="text-muted">Total Productos</p>';
+            resumenHTML += '</div></div>';
+            
+            // Canal Minorista
+            resumenHTML += '<div class="col-md-4">';
+            resumenHTML += '<div class="text-center">';
+            resumenHTML += `<h4 class="text-success">${data.resumen.canal_minorista.productos}</h4>`;
+            resumenHTML += '<p class="text-muted">Canal Minorista</p>';
+            resumenHTML += `<small class="text-info">Margen Promedio: ${data.resumen.canal_minorista.margen_promedio.toFixed(1)}%</small>`;
+            resumenHTML += '</div></div>';
+            
+            // Canal Mayorista
+            resumenHTML += '<div class="col-md-4">';
+            resumenHTML += '<div class="text-center">';
+            resumenHTML += `<h4 class="text-warning">${data.resumen.canal_mayorista.productos}</h4>`;
+            resumenHTML += '<p class="text-muted">Canal Mayorista</p>';
+            resumenHTML += `<small class="text-info">Margen Promedio: ${data.resumen.canal_mayorista.margen_promedio.toFixed(1)}%</small>`;
+            resumenHTML += '</div></div>';
+            
+            resumenHTML += '</div></div></div>';
+            
+            // Tabla de productos con ambos canales
+            let tablaHTML = '<div class="card">';
+            tablaHTML += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
+            tablaHTML += '<div class="card-body">';
+            tablaHTML += '<div class="table-responsive">';
+            tablaHTML += '<table class="table table-striped table-hover">';
+            tablaHTML += '<thead class="table-dark">';
+            tablaHTML += '<tr>';
+            tablaHTML += '<th>Código</th>';
+            tablaHTML += '<th>Nombre</th>';
+            tablaHTML += '<th>Precio Base</th>';
+            tablaHTML += '<th colspan="3" class="text-center text-success">Canal Minorista</th>';
+            tablaHTML += '<th colspan="3" class="text-center text-warning">Canal Mayorista</th>';
+            tablaHTML += '</tr>';
+            tablaHTML += '<tr>';
+            tablaHTML += '<th></th>';
+            tablaHTML += '<th></th>';
+            tablaHTML += '<th></th>';
+            tablaHTML += '<th class="text-success">Precio Final</th>';
+            tablaHTML += '<th class="text-success">Markup</th>';
+            tablaHTML += '<th class="text-success">Estado</th>';
+            tablaHTML += '<th class="text-warning">Precio Final</th>';
+            tablaHTML += '<th class="text-warning">Markup</th>';
+            tablaHTML += '<th class="text-warning">Estado</th>';
+            tablaHTML += '</tr>';
+            tablaHTML += '</thead>';
+            tablaHTML += '<tbody>';
+            
+            // Mostrar productos (máximo 10)
+            const productosAMostrar = data.productos_detalle.slice(0, 10);
+            
+            productosAMostrar.forEach(producto => {
+                const minorista = producto.canales?.minorista || {};
+                const mayorista = producto.canales?.mayorista || {};
                 
-                html += '<div class="col-md-6">';
-                html += '<div class="card">';
-                html += '<div class="card-header">✅ Estado de Rentabilidad</div>';
-                html += '<div class="card-body">';
-                html += `<p><strong>OK:</strong> ${resumen.rentabilidad_ok || 0}</p>`;
-                html += `<p><strong>Revisar:</strong> ${resumen.rentabilidad_revisar || 0}</p>`;
-                html += `<p><strong>Ajustar:</strong> ${resumen.rentabilidad_ajustar || 0}</p>`;
-                html += '</div></div></div>';
-                html += '</div>';
-            }
-            
-            // Tabla de productos - AGREGAR A MOSTRAR PASOS COMPLETADOS
-            console.log('🔍 Verificando productos_detalle en mostrarPasosCompletados:', data.productos_detalle);
-            console.log('📊 Longitud de productos_detalle:', data.productos_detalle ? data.productos_detalle.length : 'No disponible');
-            
-            if (data.productos_detalle && data.productos_detalle.length > 0) {
-                console.log('✅ Mostrando tabla de productos con', data.productos_detalle.length, 'productos');
-                html += '<div class="card">';
-                html += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
-                html += '<div class="card-body">';
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-striped table-hover">';
-                html += '<thead class="table-dark">';
-                html += '<tr>';
-                html += '<th>Código</th>';
-                html += '<th>Nombre</th>';
-                html += '<th>Precio Base</th>';
-                html += '<th>Precio Final</th>';
-                html += '<th>Margen</th>';
-                html += '<th>Estado</th>';
-                html += '<th>Alertas</th>';
-                html += '</tr>';
-                html += '</thead>';
-                html += '<tbody>';
+                let estadoMinoristaClass = '';
+                if (minorista.estado === 'ÓPTIMO') estadoMinoristaClass = 'text-success';
+                else if (minorista.estado === 'ADVERTENCIA') estadoMinoristaClass = 'text-warning';
+                else if (minorista.estado === 'CRÍTICO') estadoMinoristaClass = 'text-danger';
                 
-                data.productos_detalle.forEach((producto, index) => {
-                    console.log(`📋 Procesando producto ${index + 1}:`, producto);
-                    const estadoClass = producto.estado === 'OK' ? 'success' : 
-                                      producto.estado === 'Revisar' ? 'warning' : 'danger';
-                    const estadoIcon = producto.estado === 'OK' ? 'check-circle' : 
-                                     producto.estado === 'Revisar' ? 'exclamation-triangle' : 'times-circle';
-                    
-                    html += '<tr>';
-                    html += `<td><strong>${producto.codigo}</strong></td>`;
-                    html += `<td>${producto.nombre}</td>`;
-                    html += `<td>$${producto.precio_base.toFixed(2)}</td>`;
-                    html += `<td>$${producto.precio_final.toFixed(2)}</td>`;
-                    html += `<td>${producto.margen.toFixed(1)}%</td>`;
-                    html += `<td><span class="badge bg-${estadoClass}"><i class="fas fa-${estadoIcon}"></i> ${producto.estado}</span></td>`;
-                    html += `<td>${producto.alertas && Array.isArray(producto.alertas) && producto.alertas.length > 0 ? producto.alertas.join(', ') : '-'}</td>`;
-                    html += '</tr>';
-                });
+                let estadoMayoristaClass = '';
+                if (mayorista.estado === 'ÓPTIMO') estadoMayoristaClass = 'text-success';
+                else if (mayorista.estado === 'ADVERTENCIA') estadoMayoristaClass = 'text-warning';
+                else if (mayorista.estado === 'CRÍTICO') estadoMayoristaClass = 'text-danger';
                 
-                html += '</tbody>';
-                html += '</table>';
-                html += '</div>';
-                html += '</div></div>';
-            } else {
-                console.log('❌ No hay productos_detalle disponibles en mostrarPasosCompletados');
-                html += '<div class="alert alert-warning">';
-                html += '<i class="fas fa-exclamation-triangle"></i> ';
-                html += 'No se pudieron mostrar los detalles de los productos. ';
-                html += 'Verifica la consola para más información.';
-                html += '</div>';
-            }
+                tablaHTML += '<tr>';
+                tablaHTML += `<td><strong>${producto.codigo}</strong></td>`;
+                tablaHTML += `<td>${producto.nombre}</td>`;
+                tablaHTML += `<td>$${producto.precio_base.toLocaleString()}</td>`;
+                
+                // Datos Minorista
+                tablaHTML += `<td class="text-success">$${minorista.precio_final ? minorista.precio_final.toLocaleString() : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-success">${minorista.markup_aplicado ? minorista.markup_aplicado.toFixed(1) + '%' : 'N/A'}</td>`;
+                tablaHTML += `<td class="${estadoMinoristaClass}"><strong>${minorista.estado || 'N/A'}</strong></td>`;
+                
+                // Datos Mayorista
+                tablaHTML += `<td class="text-warning">$${mayorista.precio_final ? mayorista.precio_final.toLocaleString() : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-warning">${mayorista.markup_aplicado ? mayorista.markup_aplicado.toFixed(1) + '%' : 'N/A'}</td>`;
+                tablaHTML += `<td class="${estadoMayoristaClass}"><strong>${mayorista.estado || 'N/A'}</strong></td>`;
+                
+                tablaHTML += '</tr>';
+            });
             
-            console.log('🔍 Elementos DOM encontrados:');
-            console.log('  - resultsSection:', resultsSection);
-            console.log('  - resultsContent:', resultsContent);
-            console.log('📋 HTML generado (primeros 500 caracteres):', html.substring(0, 500));
+            tablaHTML += '</tbody></table></div>';
             
-            if (resultsContent) {
-                resultsContent.innerHTML = html;
-                console.log('✅ HTML insertado en resultsContent');
-            } else {
-                console.log('❌ resultsContent no encontrado');
-            }
+            // Información adicional
+            tablaHTML += '<div class="mt-3">';
+            tablaHTML += '<div class="row">';
+            tablaHTML += '<div class="col-md-6">';
+            tablaHTML += '<div class="alert alert-success">';
+            tablaHTML += '<strong>Canal Minorista:</strong> ';
+            tablaHTML += `${data.resumen.reglas_detectadas.minorista} reglas detectadas, `;
+            tablaHTML += `markup variable por producto`;
+            tablaHTML += '</div></div>';
+            tablaHTML += '<div class="col-md-6">';
+            tablaHTML += '<div class="alert alert-warning">';
+            tablaHTML += '<strong>Canal Mayorista:</strong> ';
+            tablaHTML += `${data.resumen.reglas_detectadas.mayorista} reglas detectadas, `;
+            tablaHTML += `markup variable por producto`;
+            tablaHTML += '</div></div>';
+            tablaHTML += '</div></div>';
             
-            if (resultsSection) {
-                resultsSection.style.display = 'block';
-                console.log('✅ resultsSection mostrado');
-            } else {
-                console.log('❌ resultsSection no encontrado');
-            }
+            tablaHTML += '</div></div>';
+            
+            // Combinar todo
+            resultadosDiv.innerHTML = pasosHTML + resumenHTML + tablaHTML;
+            resultadosDiv.style.display = 'block';
+            
+            console.log("✅ Resultados mostrados exitosamente");
         }
 
         function mostrarResultados(data) {
@@ -1330,86 +1307,6 @@
             });
         }
 
-        function mostrarDiagnosticoDetallado(data) {
-            const resultsSection = document.getElementById('resultsSection');
-            const resultsContent = document.getElementById('resultsContent');
-            
-            let html = '<h4><i class="fas fa-microscope"></i> Análisis Detallado de Datos</h4>';
-            
-            // Datos de precios
-            if (data.precios.cargado && data.precios.datos_ejemplo.length > 0) {
-                html += '<div class="card mb-4">';
-                html += '<div class="card-header">📊 Datos de Precios (Primeros 3 productos)</div>';
-                html += '<div class="card-body">';
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-striped">';
-                
-                // Header dinámico basado en las columnas del primer producto
-                const primerProducto = data.precios.datos_ejemplo[0];
-                html += '<thead><tr>';
-                Object.keys(primerProducto).forEach(col => {
-                    html += `<th>${col}</th>`;
-                });
-                html += '</tr></thead>';
-                
-                // Datos
-                html += '<tbody>';
-                data.precios.datos_ejemplo.forEach(producto => {
-                    html += '<tr>';
-                    Object.values(producto).forEach(valor => {
-                        html += `<td>${valor}</td>`;
-                    });
-                    html += '</tr>';
-                });
-                html += '</tbody>';
-                html += '</table>';
-                html += '</div>';
-                html += '</div></div>';
-            }
-            
-            // Datos de rentabilidades
-            if (data.rentabilidades.cargado && data.rentabilidades.datos_ejemplo.length > 0) {
-                html += '<div class="card mb-4">';
-                html += '<div class="card-header">📈 Datos de Rentabilidades (Primeras 3 reglas)</div>';
-                html += '<div class="card-body">';
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-striped">';
-                
-                // Header dinámico basado en las columnas de la primera regla
-                const primeraRegla = data.rentabilidades.datos_ejemplo[0];
-                html += '<thead><tr>';
-                Object.keys(primeraRegla).forEach(col => {
-                    html += `<th>${col}</th>`;
-                });
-                html += '</tr></thead>';
-                
-                // Datos
-                html += '<tbody>';
-                data.rentabilidades.datos_ejemplo.forEach(regla => {
-                    html += '<tr>';
-                    Object.values(regla).forEach(valor => {
-                        html += `<td>${valor}</td>`;
-                    });
-                    html += '</tr>';
-                });
-                html += '</tbody>';
-                html += '</table>';
-                html += '</div>';
-                html += '</div></div>';
-            }
-            
-            // Recomendaciones
-            html += '<div class="alert alert-info">';
-            html += '<h6><i class="fas fa-lightbulb"></i> Análisis:</h6>';
-            html += '<p>• Revisa las columnas disponibles arriba</p>';
-            html += '<p>• Identifica cuáles son código, nombre y precio</p>';
-            html += '<p>• Verifica que los datos sean correctos</p>';
-            html += '</div>';
-            
-            resultsContent.innerHTML = html;
-            resultsSection.style.display = 'block';
-        }
-
         function mostrarAnalisisPlanillaCompleja(data) {
             const resultsSection = document.getElementById('resultsSection');
             const resultsContent = document.getElementById('resultsContent');
@@ -1539,6 +1436,149 @@
             
             resultsContent.innerHTML = html;
             resultsSection.style.display = 'block';
+        }
+
+        async function analizarRentabilidades2Canales() {
+            try {
+                mostrarCarga('Analizando archivo de rentabilidades con 2 canales...');
+                
+                const response = await fetch('/api/analizar-rentabilidades-2-canales', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                ocultarCarga();
+                
+                if (data.status === 'success') {
+                    mostrarAlerta('success', `✅ ${data.mensaje}`, 'analisisStatus');
+                    mostrarAnalisisRentabilidades(data.analisis);
+                } else {
+                    mostrarAlerta('danger', `❌ ${data.mensaje}`, 'analisisStatus');
+                }
+                
+            } catch (error) {
+                ocultarCarga();
+                console.error('Error analizando rentabilidades:', error);
+                mostrarAlerta('danger', 'Error en el análisis de rentabilidades', 'analisisStatus');
+            }
+        }
+
+        function mostrarAnalisisRentabilidades(analisis) {
+            const resultadosDiv = document.getElementById('resultsContent');
+            
+            let html = '<div class="card mb-3">';
+            html += '<div class="card-header">🔍 Análisis de Rentabilidades con 2 Canales</div>';
+            html += '<div class="card-body">';
+            
+            // Resumen general
+            html += '<div class="row mb-3">';
+            html += '<div class="col-md-3">';
+            html += '<div class="text-center">';
+            html += `<h4 class="text-primary">${analisis.resumen.total_hojas}</h4>`;
+            html += '<p class="text-muted">Total Hojas</p>';
+            html += '</div></div>';
+            
+            html += '<div class="col-md-3">';
+            html += '<div class="text-center">';
+            html += `<h4 class="text-success">${analisis.resumen.total_reglas_minorista}</h4>`;
+            html += '<p class="text-muted">Reglas Minorista</p>';
+            html += '</div></div>';
+            
+            html += '<div class="col-md-3">';
+            html += '<div class="text-center">';
+            html += `<h4 class="text-warning">${analisis.resumen.total_reglas_mayorista}</h4>`;
+            html += '<p class="text-muted">Reglas Mayorista</p>';
+            html += '</div></div>';
+            
+            html += '<div class="col-md-3">';
+            html += '<div class="text-center">';
+            html += `<h4 class="text-info">${analisis.resumen.errores}</h4>`;
+            html += '<p class="text-muted">Errores</p>';
+            html += '</div></div>';
+            html += '</div>';
+            
+            // Hojas analizadas
+            if (analisis.hojas_analizadas && analisis.hojas_analizadas.length > 0) {
+                html += '<div class="card mb-3">';
+                html += '<div class="card-header">📋 Hojas Analizadas</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>Hoja</th><th>Secciones</th><th>Reglas Minorista</th><th>Reglas Mayorista</th></tr></thead>';
+                html += '<tbody>';
+                
+                analisis.hojas_analizadas.forEach(hoja => {
+                    html += '<tr>';
+                    html += `<td><strong>${hoja.nombre}</strong></td>`;
+                    html += `<td>${hoja.secciones_detectadas.join(', ')}</td>`;
+                    html += `<td class="text-success">${hoja.reglas_minorista}</td>`;
+                    html += `<td class="text-warning">${hoja.reglas_mayorista}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div></div></div>';
+            }
+            
+            // Ejemplos de reglas
+            if (analisis.reglas_minorista && analisis.reglas_minorista.length > 0) {
+                html += '<div class="card mb-3">';
+                html += '<div class="card-header text-success">💰 Ejemplos de Reglas Minorista</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>Hoja</th><th>Precio Público</th><th>Markup</th><th>Rentabilidad</th></tr></thead>';
+                html += '<tbody>';
+                
+                analisis.reglas_minorista.slice(0, 5).forEach(regla => {
+                    html += '<tr>';
+                    html += `<td>${regla.hoja}</td>`;
+                    html += `<td>$${regla.precio_publico.toLocaleString()}</td>`;
+                    html += `<td>${regla.markup.toFixed(1)}%</td>`;
+                    html += `<td>${regla.rentabilidad.toFixed(1)}%</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div></div></div>';
+            }
+            
+            if (analisis.reglas_mayorista && analisis.reglas_mayorista.length > 0) {
+                html += '<div class="card mb-3">';
+                html += '<div class="card-header text-warning">�� Ejemplos de Reglas Mayorista</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>Hoja</th><th>Precio Base</th><th>Markup</th><th>Rentabilidad</th></tr></thead>';
+                html += '<tbody>';
+                
+                analisis.reglas_mayorista.slice(0, 5).forEach(regla => {
+                    html += '<tr>';
+                    html += `<td>${regla.hoja}</td>`;
+                    html += `<td>$${regla.precio_base.toLocaleString()}</td>`;
+                    html += `<td>${regla.markup.toFixed(1)}%</td>`;
+                    html += `<td>${regla.rentabilidad.toFixed(1)}%</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div></div></div>';
+            }
+            
+            // Errores si los hay
+            if (analisis.errores && analisis.errores.length > 0) {
+                html += '<div class="alert alert-warning">';
+                html += '<strong>⚠️ Errores detectados:</strong><br>';
+                analisis.errores.forEach(error => {
+                    html += `• ${error}<br>`;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div></div>';
+            
+            resultadosDiv.innerHTML = html;
+            resultadosDiv.style.display = 'block';
         }
 
         function verTodosLosProductos() {

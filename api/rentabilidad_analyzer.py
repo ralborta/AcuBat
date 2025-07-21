@@ -4,8 +4,9 @@ Analizador inteligente de planillas de rentabilidad complejas
 
 import pandas as pd
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import re
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -294,3 +295,295 @@ class RentabilidadAnalyzer:
     def obtener_diagnostico(self) -> Dict:
         """Retorna el diagnóstico completo"""
         return self.diagnostico 
+
+def analizar_rentabilidades_2_canales(file_path: str) -> Dict[str, Any]:
+    """
+    Analiza específicamente el archivo Rentalibilidades-2.xlsx que tiene estructura
+    de dos canales: Minorista (izquierda) y Mayorista (derecha) con markups variables.
+    """
+    try:
+        logger.info(f"🔍 Analizando archivo de rentabilidades con 2 canales: {file_path}")
+        
+        # Leer todas las hojas del archivo
+        excel_file = pd.ExcelFile(file_path)
+        logger.info(f"📋 Hojas encontradas: {excel_file.sheet_names}")
+        
+        resultados = {
+            'archivo': file_path,
+            'hojas_analizadas': [],
+            'reglas_minorista': [],
+            'reglas_mayorista': [],
+            'productos_detectados': [],
+            'errores': [],
+            'resumen': {}
+        }
+        
+        for hoja_nombre in excel_file.sheet_names:
+            logger.info(f"📊 Analizando hoja: {hoja_nombre}")
+            
+            try:
+                # Leer la hoja
+                df = pd.read_excel(file_path, sheet_name=hoja_nombre, header=None)
+                logger.info(f"📏 Dimensiones de la hoja: {df.shape}")
+                
+                # Buscar las secciones de Minorista y Mayorista
+                secciones = _detectar_secciones_canales(df, hoja_nombre)
+                
+                if secciones:
+                    # Extraer reglas de cada sección
+                    reglas_minorista = _extraer_reglas_minorista(df, secciones['minorista'], hoja_nombre)
+                    reglas_mayorista = _extraer_reglas_mayorista(df, secciones['mayorista'], hoja_nombre)
+                    
+                    resultados['hojas_analizadas'].append({
+                        'nombre': hoja_nombre,
+                        'secciones_detectadas': list(secciones.keys()),
+                        'reglas_minorista': len(reglas_minorista),
+                        'reglas_mayorista': len(reglas_mayorista)
+                    })
+                    
+                    resultados['reglas_minorista'].extend(reglas_minorista)
+                    resultados['reglas_mayorista'].extend(reglas_mayorista)
+                    
+                    # Extraer códigos de productos
+                    productos = _extraer_codigos_productos(df, secciones)
+                    resultados['productos_detectados'].extend(productos)
+                    
+                else:
+                    logger.warning(f"⚠️ No se detectaron secciones de canales en la hoja: {hoja_nombre}")
+                    resultados['errores'].append(f"No se detectaron secciones en hoja: {hoja_nombre}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error analizando hoja {hoja_nombre}: {e}")
+                resultados['errores'].append(f"Error en hoja {hoja_nombre}: {str(e)}")
+        
+        # Generar resumen
+        resultados['resumen'] = {
+            'total_hojas': len(excel_file.sheet_names),
+            'hojas_con_canales': len([h for h in resultados['hojas_analizadas'] if h['secciones_detectadas']]),
+            'total_reglas_minorista': len(resultados['reglas_minorista']),
+            'total_reglas_mayorista': len(resultados['reglas_mayorista']),
+            'total_productos': len(set(resultados['productos_detectados'])),
+            'errores': len(resultados['errores'])
+        }
+        
+        logger.info(f"✅ Análisis completado: {resultados['resumen']}")
+        return resultados
+        
+    except Exception as e:
+        logger.error(f"❌ Error general analizando archivo: {e}")
+        return {
+            'archivo': file_path,
+            'error': str(e),
+            'reglas_minorista': [],
+            'reglas_mayorista': [],
+            'productos_detectados': [],
+            'errores': [str(e)]
+        }
+
+def _detectar_secciones_canales(df: pd.DataFrame, hoja_nombre: str) -> Dict[str, Dict]:
+    """
+    Detecta las secciones de Minorista (izquierda) y Mayorista (derecha) en la hoja.
+    """
+    secciones = {}
+    
+    # Buscar títulos de secciones
+    for i in range(len(df)):
+        for j in range(len(df.columns)):
+            valor = str(df.iloc[i, j]).strip().upper()
+            
+            # Detectar sección Minorista (P. Publico)
+            if 'PUBLICO' in valor or 'MINORISTA' in valor:
+                if 'IVA' in str(df.iloc[i, j+1]).upper() or 'INC' in str(df.iloc[i, j+1]).upper():
+                    secciones['minorista'] = {
+                        'fila_inicio': i,
+                        'columna_inicio': j,
+                        'titulo': valor
+                    }
+                    logger.info(f"📍 Sección Minorista detectada en fila {i}, columna {j}: {valor}")
+            
+            # Detectar sección Mayorista (P. Mayorista)
+            elif 'MAYORISTA' in valor:
+                if 'IVA' in str(df.iloc[i, j+1]).upper() or 'INC' in str(df.iloc[i, j+1]).upper():
+                    secciones['mayorista'] = {
+                        'fila_inicio': i,
+                        'columna_inicio': j,
+                        'titulo': valor
+                    }
+                    logger.info(f"📍 Sección Mayorista detectada en fila {i}, columna {j}: {valor}")
+    
+    return secciones
+
+def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str) -> List[Dict]:
+    """
+    Extrae las reglas de la sección Minorista (P. Publico).
+    """
+    reglas = []
+    
+    try:
+        fila_inicio = seccion['fila_inicio']
+        col_inicio = seccion['columna_inicio']
+        
+        # Buscar la fila con los headers de columnas (Mark-UP, Rentabilidad, etc.)
+        fila_headers = None
+        for i in range(fila_inicio + 1, min(fila_inicio + 10, len(df))):
+            fila = df.iloc[i, col_inicio:col_inicio + 10]
+            if any('MARK' in str(celda).upper() for celda in fila):
+                fila_headers = i
+                break
+        
+        if fila_headers is None:
+            logger.warning("⚠️ No se encontraron headers en sección Minorista")
+            return reglas
+        
+        # Encontrar las columnas relevantes
+        headers = df.iloc[fila_headers, col_inicio:col_inicio + 10]
+        col_publico = None
+        col_markup = None
+        col_rentabilidad = None
+        
+        for j, header in enumerate(headers):
+            header_str = str(header).upper()
+            if 'PUBLICO' in header_str:
+                col_publico = col_inicio + j
+            elif 'MARK' in header_str:
+                col_markup = col_inicio + j
+            elif 'RENTABILIDAD' in header_str:
+                col_rentabilidad = col_inicio + j
+        
+        # Extraer datos de productos
+        for i in range(fila_headers + 1, len(df)):
+            try:
+                precio_publico = df.iloc[i, col_publico] if col_publico is not None else None
+                markup = df.iloc[i, col_markup] if col_markup is not None else None
+                rentabilidad = df.iloc[i, col_rentabilidad] if col_rentabilidad is not None else None
+                
+                # Solo procesar filas con datos válidos
+                if pd.notna(precio_publico) and pd.notna(markup) and markup != '#DIV/0!':
+                    regla = {
+                        'hoja': hoja_nombre,
+                        'canal': 'Minorista',
+                        'precio_publico': _convertir_precio(precio_publico),
+                        'markup': _convertir_porcentaje(markup),
+                        'rentabilidad': _convertir_porcentaje(rentabilidad),
+                        'fila': i
+                    }
+                    reglas.append(regla)
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Error procesando fila {i} en Minorista: {e}")
+                continue
+        
+        logger.info(f"✅ Extraídas {len(reglas)} reglas Minorista de hoja {hoja_nombre}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error extrayendo reglas Minorista: {e}")
+    
+    return reglas
+
+def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str) -> List[Dict]:
+    """
+    Extrae las reglas de la sección Mayorista (P. Mayorista).
+    """
+    reglas = []
+    
+    try:
+        fila_inicio = seccion['fila_inicio']
+        col_inicio = seccion['columna_inicio']
+        
+        # Buscar la fila con los headers de columnas (Mak-up, rentabili, etc.)
+        fila_headers = None
+        for i in range(fila_inicio + 1, min(fila_inicio + 10, len(df))):
+            fila = df.iloc[i, col_inicio:col_inicio + 10]
+            if any('MAK' in str(celda).upper() for celda in fila):
+                fila_headers = i
+                break
+        
+        if fila_headers is None:
+            logger.warning("⚠️ No se encontraron headers en sección Mayorista")
+            return reglas
+        
+        # Encontrar las columnas relevantes
+        headers = df.iloc[fila_headers, col_inicio:col_inicio + 10]
+        col_precio_base = None
+        col_markup = None
+        col_rentabilidad = None
+        
+        for j, header in enumerate(headers):
+            header_str = str(header).upper()
+            if 'MAK' in header_str and 'UP' in header_str:
+                col_markup = col_inicio + j
+            elif 'RENTABIL' in header_str:
+                col_rentabilidad = col_inicio + j
+            elif j == 0:  # Primera columna suele ser el precio base
+                col_precio_base = col_inicio + j
+        
+        # Extraer datos de productos
+        for i in range(fila_headers + 1, len(df)):
+            try:
+                precio_base = df.iloc[i, col_precio_base] if col_precio_base is not None else None
+                markup = df.iloc[i, col_markup] if col_markup is not None else None
+                rentabilidad = df.iloc[i, col_rentabilidad] if col_rentabilidad is not None else None
+                
+                # Solo procesar filas con datos válidos
+                if pd.notna(precio_base) and pd.notna(markup) and markup != '#DIV/0!':
+                    regla = {
+                        'hoja': hoja_nombre,
+                        'canal': 'Mayorista',
+                        'precio_base': _convertir_precio(precio_base),
+                        'markup': _convertir_porcentaje(markup),
+                        'rentabilidad': _convertir_porcentaje(rentabilidad),
+                        'fila': i
+                    }
+                    reglas.append(regla)
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Error procesando fila {i} en Mayorista: {e}")
+                continue
+        
+        logger.info(f"✅ Extraídas {len(reglas)} reglas Mayorista de hoja {hoja_nombre}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error extrayendo reglas Mayorista: {e}")
+    
+    return reglas
+
+def _extraer_codigos_productos(df: pd.DataFrame, secciones: Dict) -> List[str]:
+    """
+    Extrae los códigos de productos de ambas secciones.
+    """
+    codigos = []
+    
+    # Por ahora, asumimos que los códigos están en la primera columna de cada sección
+    # En una implementación más avanzada, buscaríamos una columna específica de códigos
+    
+    return codigos
+
+def _convertir_precio(valor) -> float:
+    """
+    Convierte un valor de precio a float, manejando formatos con $ y comas.
+    """
+    if pd.isna(valor):
+        return 0.0
+    
+    try:
+        if isinstance(valor, str):
+            # Remover símbolos de moneda y espacios
+            valor = valor.replace('$', '').replace(' ', '').replace(',', '')
+        return float(valor)
+    except:
+        return 0.0
+
+def _convertir_porcentaje(valor) -> float:
+    """
+    Convierte un valor de porcentaje a float, manejando formatos con %.
+    """
+    if pd.isna(valor) or valor == '#DIV/0!':
+        return 0.0
+    
+    try:
+        if isinstance(valor, str):
+            # Remover símbolo de porcentaje
+            valor = valor.replace('%', '').replace(',', '.')
+        return float(valor)
+    except:
+        return 0.0 

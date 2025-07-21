@@ -968,211 +968,185 @@ async def obtener_sugerencias_precio(codigo_producto: str):
 
 @app.post("/calcular-precios-con-rentabilidad")
 async def calcular_precios_con_rentabilidad():
-    """Endpoint para calcular precios con el nuevo flujo simplificado"""
-    global precios_data, rentabilidades_data
-    
+    """
+    Calcula precios usando la nueva estructura de 2 canales (Minorista y Mayorista)
+    con markups variables para cada canal.
+    """
     try:
-        logger.info("🚀 Iniciando proceso de pricing simplificado...")
+        logger.info("🚀 Iniciando cálculo de precios con estructura de 2 canales")
         
-        # Verificar que tengamos ambos archivos
-        logger.info(f"🔍 Verificando archivos antes de procesar:")
-        logger.info(f"  - precios_data: {precios_data is not None}")
-        logger.info(f"  - rentabilidades_data: {rentabilidades_data is not None}")
-        
-        if precios_data is None:
-            logger.warning("❌ No hay archivo de precios cargado")
+        # Verificar que tenemos los archivos cargados
+        if not precios_data or not rentabilidades_data:
+            logger.error("❌ No hay archivos cargados")
             return {
                 "status": "error",
-                "mensaje": "❌ No hay archivo de precios cargado. Carga primero la lista de precios."
+                "mensaje": "No hay archivos cargados. Sube primero los archivos de precios y rentabilidades.",
+                "productos": 0,
+                "productos_detalle": [],
+                "pasos_completados": [],
+                "resumen": {}
             }
         
-        if rentabilidades_data is None:
-            logger.warning("❌ No hay archivo de rentabilidades cargado")
+        # Analizar el archivo de rentabilidades con la nueva función
+        logger.info("🔍 Analizando archivo de rentabilidades con estructura de 2 canales")
+        
+        # Usar el archivo físico si está disponible
+        rentabilidades_file_path = None
+        if rentabilidades_filename:
+            if os.path.exists(rentabilidades_filename):
+                rentabilidades_file_path = rentabilidades_filename
+            elif os.path.exists(f"data/{rentabilidades_filename}"):
+                rentabilidades_file_path = f"data/{rentabilidades_filename}"
+            elif os.path.exists("Rentalibilidades-2.xlsx"):
+                rentabilidades_file_path = "Rentalibilidades-2.xlsx"
+        
+        if not rentabilidades_file_path:
+            logger.error("❌ No se encontró el archivo de rentabilidades")
             return {
-                "status": "error", 
-                "mensaje": "❌ No hay archivo de rentabilidades cargado. Carga primero las reglas de rentabilidad."
+                "status": "error",
+                "mensaje": "No se encontró el archivo de rentabilidades. Asegúrate de que esté en el proyecto.",
+                "productos": 0,
+                "productos_detalle": [],
+                "pasos_completados": [],
+                "resumen": {}
             }
         
-        # Buscar hojas disponibles
-        hojas_precios = list(precios_data.keys())
-        hojas_rentabilidad = list(rentabilidades_data.keys())
+        # Analizar rentabilidades con la nueva función
+        analisis_rentabilidades = analizar_rentabilidades_2_canales(rentabilidades_file_path)
+        logger.info(f"📊 Análisis de rentabilidades: {analisis_rentabilidades['resumen']}")
         
-        # Buscar coincidencias por nombre (priorizar Moura)
-        hoja_precios = None
-        hoja_rentabilidad = None
+        if not analisis_rentabilidades['reglas_minorista'] and not analisis_rentabilidades['reglas_mayorista']:
+            logger.error("❌ No se encontraron reglas de rentabilidad")
+            return {
+                "status": "error",
+                "mensaje": "No se encontraron reglas de rentabilidad en el archivo. Verifica la estructura del archivo.",
+                "productos": 0,
+                "productos_detalle": [],
+                "pasos_completados": [],
+                "resumen": {}
+            }
         
-        # Buscar hoja "Moura" en rentabilidades
-        for hoja_rent in hojas_rentabilidad:
-            if isinstance(hoja_rent, str) and 'moura' in hoja_rent.lower():
-                hoja_rentabilidad = hoja_rent
-                break
+        # Procesar productos de precios
+        logger.info("🔄 Procesando productos de precios")
+        productos_procesados = []
         
-        # Si no hay hoja Moura en rentabilidades, usar la primera
-        if not hoja_rentabilidad:
-            hoja_rentabilidad = hojas_rentabilidad[0] if hojas_rentabilidad else None
-        
-        # Buscar cualquier hoja de precios que contenga productos Moura
-        # (códigos que empiecen con M)
-        for hoja_precio in hojas_precios:
-            precios_hoja_temp = precios_data[hoja_precio]
-            if precios_hoja_temp:
-                # Verificar si hay productos con códigos que empiecen con M (Moura)
-                for producto in precios_hoja_temp[:5]:  # Revisar solo los primeros 5
-                    codigo = str(producto.get('CODIGO BATERIAS', '')).strip()
-                    if codigo and codigo.startswith('M') and len(codigo) > 1:
-                        hoja_precios = hoja_precio
-                        break
-                if hoja_precios:
+        # Seleccionar la hoja de precios (buscar "Moura" primero)
+        precios_hoja = None
+        if isinstance(precios_data, dict):
+            # Si es un diccionario con hojas
+            for hoja_nombre, datos in precios_data.items():
+                if 'moura' in hoja_nombre.lower():
+                    precios_hoja = datos
                     break
+            if not precios_hoja and precios_data:
+                precios_hoja = list(precios_data.values())[0]
+        else:
+            # Si es una lista directa
+            precios_hoja = precios_data
         
-        # Si no se encuentra hoja con productos Moura, usar la primera
-        if not hoja_precios:
-            hoja_precios = hojas_precios[0] if hojas_precios else None
-        
-        if not hoja_precios:
+        if not precios_hoja:
+            logger.error("❌ No se encontró hoja de precios válida")
             return {
                 "status": "error",
-                "mensaje": "No se encontraron hojas en el archivo de precios"
+                "mensaje": "No se encontró hoja de precios válida.",
+                "productos": 0,
+                "productos_detalle": [],
+                "pasos_completados": [],
+                "resumen": {}
             }
         
-        if not hoja_rentabilidad:
-            return {
-                "status": "error", 
-                "mensaje": "No se encontraron hojas en el archivo de rentabilidades"
-            }
+        logger.info(f"📋 Procesando {len(precios_hoja)} productos de precios")
         
-        logger.info(f"✅ Procesando: Precios en '{hoja_precios}' y Rentabilidad en '{hoja_rentabilidad}'")
-        
-        # Verificar que realmente estamos usando la hoja Moura
-        if isinstance(hoja_rentabilidad, str) and 'moura' not in hoja_rentabilidad.lower():
-            logger.warning(f"⚠️ ADVERTENCIA: No se está usando la hoja Moura. Hoja seleccionada: {hoja_rentabilidad}")
-        
-        # Obtener datos
-        precios_hoja = precios_data[hoja_precios]
-        rentabilidad_hoja = rentabilidades_data[hoja_rentabilidad]
-        
-        logger.info(f"Productos en precios: {len(precios_hoja)}")
-        logger.info(f"Reglas en rentabilidad: {len(rentabilidad_hoja)}")
-        logger.info(f"Primer producto: {precios_hoja[0] if precios_hoja else 'No hay productos'}")
-        logger.info(f"Primera regla: {rentabilidad_hoja[0] if rentabilidad_hoja else 'No hay reglas'}")
-        
-        # Logging detallado de la estructura de datos
-        if precios_hoja:
-            logger.info(f"Claves del primer producto: {list(precios_hoja[0].keys())}")
-            logger.info(f"Valores del primer producto: {precios_hoja[0]}")
-        if rentabilidad_hoja:
-            logger.info(f"Claves de la primera regla: {list(rentabilidad_hoja[0].keys())}")
-            logger.info(f"Valores de la primera regla: {rentabilidad_hoja[0]}")
-            
-            # Verificar si las reglas tienen códigos de productos Moura
-            logger.info(f"🔍 Verificando reglas de rentabilidad para productos Moura:")
-            for i, regla in enumerate(rentabilidad_hoja[:5]):
-                # Buscar cualquier campo que pueda contener códigos de productos
-                for key, value in regla.items():
-                    if str(value) != 'nan' and value is not None:
-                        if isinstance(value, str) and value.startswith('M') and len(value) > 1:
-                            logger.info(f"  ✅ Regla {i+1}: Encontrado código Moura '{value}' en columna '{key}'")
-                        elif isinstance(key, str) and key.lower() in ['codigo', 'modelo', 'producto', 'articulo']:
-                            logger.info(f"  📋 Regla {i+1}: Columna '{key}' = '{value}'")
-        
-        # Convertir datos a productos
-        productos = []
-        logger.info(f"🔄 Convirtiendo {len(precios_hoja)} productos...")
+        # Convertir productos de precios
+        productos_precios = []
         for i, item in enumerate(precios_hoja):
             try:
-                logger.info(f"  Procesando producto {i+1}: {item}")
-                # Extraer datos del archivo de precios
-                codigo = str(item.get('CODIGO BATERIAS', '')).strip()
-                nombre = str(item.get('DENOMINACION COMERCIAL / ALGUNAS APLICACIONES (4)', '')).strip()
-                precio_lista = item.get('Precio de Lista', 0)
+                # Extraer datos del producto
+                codigo = str(item.get('CODIGO BATERIAS', item.get('CODIGO', ''))).strip()
+                nombre = str(item.get('DENOMINACION COMERCIAL / ALGUNAS APLICACIONES (4)', 
+                                    item.get('NOMBRE', item.get('DENOMINACION', '')))).strip()
+                precio_lista = item.get('Precio de Lista', item.get('PRECIO', 0))
                 
-                # Solo procesar productos válidos (con código y precio)
+                # Solo procesar productos válidos
                 if codigo and codigo != 'nan' and precio_lista and precio_lista != 'nan':
-                    producto = Producto(
-                        codigo=codigo,
-                        nombre=nombre if nombre != 'nan' else f'Producto {codigo}',
-                        marca=Marca.MOURA,  # Por ahora solo Moura
-                        canal=Canal.MINORISTA,  # Por defecto minorista
-                        categoria='Baterías',
-                        precio_base=float(precio_lista),
-                        precio_final=0,
-                        margen=0,
-                        markup_aplicado=0,
-                        estado_rentabilidad='',
-                        margen_minimo_esperado=0,
-                        margen_optimo_esperado=0,
-                        alertas=[],
-                        sugerencias_openai=''
-                    )
-                    productos.append(producto)
-                    logger.info(f"  ✅ Producto {i+1} convertido: {codigo} - ${precio_lista}")
+                    productos_precios.append({
+                        'codigo': codigo,
+                        'nombre': nombre if nombre != 'nan' else f'Producto {codigo}',
+                        'precio_base': float(precio_lista)
+                    })
+                    logger.info(f"  ✅ Producto {i+1}: {codigo} - ${precio_lista}")
                 else:
                     logger.info(f"  ⚠️ Producto {i+1} saltado: código='{codigo}', precio='{precio_lista}'")
-                    continue
+                    
             except Exception as e:
-                logger.error(f"Error convirtiendo producto {i+1}: {e}")
+                logger.error(f"Error procesando producto {i+1}: {e}")
                 continue
         
-        logger.info(f"✅ Total productos convertidos: {len(productos)}")
+        logger.info(f"✅ Total productos de precios válidos: {len(productos_precios)}")
         
-        # Procesar productos directamente con los datos en memoria
-        logger.info("🔄 Procesando productos con datos en memoria...")
-        logger.info(f"Total productos a procesar: {len(productos)}")
-        
-        productos_procesados = []
-        pasos_completados = []
-        
-        for producto in productos:
+        # Procesar cada producto con ambos canales
+        for producto_precio in productos_precios:
             try:
-                # Buscar regla de rentabilidad correspondiente
-                regla_encontrada = None
+                codigo = producto_precio['codigo']
+                nombre = producto_precio['nombre']
+                precio_base = producto_precio['precio_base']
                 
-                # Buscar por código de producto
-                for regla in rentabilidad_hoja:
-                    if 'codigo' in regla:
-                        if str(regla['codigo']).strip() == str(producto.codigo).strip():
-                            regla_encontrada = regla
-                            break
+                # Buscar reglas para ambos canales
+                regla_minorista = None
+                regla_mayorista = None
                 
-                # Si no se encuentra, usar primera regla como default
-                if not regla_encontrada and len(rentabilidad_hoja) > 0:
-                    regla_encontrada = rentabilidad_hoja[0]
+                # Buscar regla minorista (por índice de fila o usar la primera disponible)
+                if analisis_rentabilidades['reglas_minorista']:
+                    # Usar la primera regla como default, o buscar por código si es posible
+                    regla_minorista = analisis_rentabilidades['reglas_minorista'][0]
                 
-                # Calcular precio con markup
-                precio_base = producto.precio_base
-                markup = float(regla_encontrada.get('markup', 20)) if regla_encontrada else 20
+                # Buscar regla mayorista
+                if analisis_rentabilidades['reglas_mayorista']:
+                    regla_mayorista = analisis_rentabilidades['reglas_mayorista'][0]
                 
-                # Aplicar markup
-                precio_con_markup = precio_base * (1 + markup / 100)
+                # Calcular precios para ambos canales
+                producto_resultado = {
+                    'codigo': codigo,
+                    'nombre': nombre,
+                    'precio_base': precio_base,
+                    'canales': {}
+                }
                 
-                # Redondear a múltiplos de 100
-                precio_final = round(precio_con_markup / 100) * 100
+                # Canal Minorista
+                if regla_minorista:
+                    markup_minorista = regla_minorista['markup']
+                    precio_minorista = precio_base * (1 + markup_minorista / 100)
+                    # Redondear a múltiplos de 100
+                    precio_minorista = round(precio_minorista / 100) * 100
+                    margen_minorista = ((precio_minorista - precio_base) / precio_minorista) * 100
+                    
+                    producto_resultado['canales']['minorista'] = {
+                        'precio_final': precio_minorista,
+                        'markup_aplicado': markup_minorista,
+                        'margen': margen_minorista,
+                        'estado': 'ÓPTIMO' if margen_minorista >= 20 else 'ADVERTENCIA' if margen_minorista >= 10 else 'CRÍTICO'
+                    }
                 
-                # Calcular margen
-                margen = ((precio_final - precio_base) / precio_final) * 100
+                # Canal Mayorista
+                if regla_mayorista:
+                    markup_mayorista = regla_mayorista['markup']
+                    precio_mayorista = precio_base * (1 + markup_mayorista / 100)
+                    # Redondear a múltiplos de 100
+                    precio_mayorista = round(precio_mayorista / 100) * 100
+                    margen_mayorista = ((precio_mayorista - precio_base) / precio_mayorista) * 100
+                    
+                    producto_resultado['canales']['mayorista'] = {
+                        'precio_final': precio_mayorista,
+                        'markup_aplicado': markup_mayorista,
+                        'margen': margen_mayorista,
+                        'estado': 'ÓPTIMO' if margen_mayorista >= 20 else 'ADVERTENCIA' if margen_mayorista >= 10 else 'CRÍTICO'
+                    }
                 
-                # Actualizar producto
-                producto.precio_final = precio_final
-                producto.margen = margen
-                producto.markup_aplicado = markup
-                
-                # Verificar rentabilidad
-                margen_minimo = float(regla_encontrada.get('margen_minimo', 10)) if regla_encontrada else 10
-                margen_optimo = float(regla_encontrada.get('margen_optimo', 25)) if regla_encontrada else 25
-                
-                if margen < margen_minimo:
-                    producto.alertas.append(f"Margen bajo: {margen:.1f}% < {margen_minimo}%")
-                    producto.estado_rentabilidad = "CRÍTICO"
-                elif margen < margen_optimo:
-                    producto.alertas.append(f"Margen subóptimo: {margen:.1f}% < {margen_optimo}%")
-                    producto.estado_rentabilidad = "ADVERTENCIA"
-                else:
-                    producto.estado_rentabilidad = "ÓPTIMO"
-                
-                productos_procesados.append(producto)
+                productos_procesados.append(producto_resultado)
+                logger.info(f"✅ Producto {codigo} procesado: Minorista=${producto_resultado['canales'].get('minorista', {}).get('precio_final', 0)}, Mayorista=${producto_resultado['canales'].get('mayorista', {}).get('precio_final', 0)}")
                 
             except Exception as e:
-                logger.error(f"Error procesando producto {producto.codigo}: {e}")
+                logger.error(f"Error procesando producto {codigo}: {e}")
                 continue
         
         # Actualizar datos globales
@@ -1181,48 +1155,102 @@ async def calcular_precios_con_rentabilidad():
         
         pasos_completados = [
             "✅ Archivos cargados",
+            "✅ Análisis de rentabilidades con 2 canales",
             "✅ Productos convertidos",
-            "✅ Reglas de rentabilidad aplicadas", 
-            "✅ Precios calculados",
+            "✅ Reglas de rentabilidad aplicadas por canal",
+            "✅ Precios calculados para Minorista y Mayorista",
             "✅ Validación completada"
         ]
         
         logger.info(f"✅ Proceso completado exitosamente - {len(productos_procesados)} productos")
-        logger.info(f"📊 Resumen: {len(productos_procesados)} productos procesados de {len(productos)} originales")
         
-        # Convertir productos a diccionarios para JSON
-        productos_json = []
-        for producto in productos_procesados:
-            productos_json.append({
-                "codigo": producto.codigo,
-                "nombre": producto.nombre,
-                "precio_base": producto.precio_base,
-                "precio_final": producto.precio_final,
-                "margen": producto.margen,
-                "estado": producto.estado_rentabilidad,
-                "alertas": producto.alertas,
-                "markup_aplicado": producto.markup_aplicado
-            })
+        # Generar resumen
+        total_minorista = len([p for p in productos_procesados if 'minorista' in p['canales']])
+        total_mayorista = len([p for p in productos_procesados if 'mayorista' in p['canales']])
+        
+        margen_promedio_minorista = sum([p['canales']['minorista']['margen'] for p in productos_procesados if 'minorista' in p['canales']]) / total_minorista if total_minorista > 0 else 0
+        margen_promedio_mayorista = sum([p['canales']['mayorista']['margen'] for p in productos_procesados if 'mayorista' in p['canales']]) / total_mayorista if total_mayorista > 0 else 0
         
         return {
             "status": "success",
-            "mensaje": f"Proceso completado exitosamente para {len(productos_procesados)} productos",
+            "mensaje": f"Proceso completado exitosamente para {len(productos_procesados)} productos con 2 canales",
             "productos": len(productos_procesados),
-            "productos_detalle": productos_json,  # Lista completa de productos
+            "productos_detalle": productos_procesados,
             "pasos_completados": pasos_completados,
             "resumen": {
                 "total_productos": len(productos_procesados),
-                "con_alertas": len([p for p in productos_procesados if p.alertas]),
-                "margen_promedio": sum([p.margen for p in productos_procesados]) / len(productos_procesados) if productos_procesados else 0
+                "canal_minorista": {
+                    "productos": total_minorista,
+                    "margen_promedio": margen_promedio_minorista
+                },
+                "canal_mayorista": {
+                    "productos": total_mayorista,
+                    "margen_promedio": margen_promedio_mayorista
+                },
+                "reglas_detectadas": {
+                    "minorista": len(analisis_rentabilidades['reglas_minorista']),
+                    "mayorista": len(analisis_rentabilidades['reglas_mayorista'])
+                }
             }
         }
         
     except Exception as e:
-        logger.error(f"Error calculando precios: {str(e)}")
+        logger.error(f"❌ Error en cálculo de precios: {e}")
+        logger.error(traceback.format_exc())
         return {
             "status": "error",
-            "mensaje": f"Error: {str(e)}"
-        } 
+            "mensaje": f"Error en el cálculo: {str(e)}",
+            "productos": 0,
+            "productos_detalle": [],
+            "pasos_completados": [],
+            "resumen": {}
+        }
+
+@app.post("/api/analizar-rentabilidades-2-canales")
+async def analizar_rentabilidades_2_canales_endpoint():
+    """
+    Analiza específicamente el archivo Rentalibilidades-2.xlsx con estructura de 2 canales.
+    """
+    try:
+        logger.info("🔍 Iniciando análisis de rentabilidades con 2 canales")
+        
+        # Buscar el archivo
+        archivo_path = None
+        posibles_paths = [
+            "Rentalibilidades-2.xlsx",
+            "Rentalibilidades-2.xls",
+            "data/Rentalibilidades-2.xlsx",
+            "data/Rentalibilidades-2.xls"
+        ]
+        
+        for path in posibles_paths:
+            if os.path.exists(path):
+                archivo_path = path
+                break
+        
+        if not archivo_path:
+            return {
+                "status": "error",
+                "mensaje": "No se encontró el archivo Rentalibilidades-2.xlsx en el proyecto",
+                "analisis": None
+            }
+        
+        # Analizar el archivo
+        analisis = analizar_rentabilidades_2_canales(archivo_path)
+        
+        return {
+            "status": "success",
+            "mensaje": f"Análisis completado para {archivo_path}",
+            "analisis": analisis
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error analizando rentabilidades: {e}")
+        return {
+            "status": "error",
+            "mensaje": f"Error en el análisis: {str(e)}",
+            "analisis": None
+        }
 
 @app.get("/api/logs")
 async def obtener_logs():
