@@ -1008,6 +1008,10 @@ async def calcular_precios_con_rentabilidad():
         
         logger.info(f"✅ Procesando: Precios en '{hoja_precios}' y Rentabilidad en '{hoja_rentabilidad}'")
         
+        # Verificar que realmente estamos usando la hoja Moura
+        if 'moura' not in hoja_rentabilidad.lower():
+            logger.warning(f"⚠️ ADVERTENCIA: No se está usando la hoja Moura. Hoja seleccionada: {hoja_rentabilidad}")
+        
         # Obtener datos
         precios_hoja = precios_data[hoja_precios]
         rentabilidad_hoja = rentabilidades_data[hoja_rentabilidad]
@@ -1024,6 +1028,17 @@ async def calcular_precios_con_rentabilidad():
         if rentabilidad_hoja:
             logger.info(f"Claves de la primera regla: {list(rentabilidad_hoja[0].keys())}")
             logger.info(f"Valores de la primera regla: {rentabilidad_hoja[0]}")
+            
+            # Verificar si las reglas tienen códigos de productos Moura
+            logger.info(f"🔍 Verificando reglas de rentabilidad para productos Moura:")
+            for i, regla in enumerate(rentabilidad_hoja[:5]):
+                # Buscar cualquier campo que pueda contener códigos de productos
+                for key, value in regla.items():
+                    if str(value) != 'nan' and value is not None:
+                        if isinstance(value, str) and value.startswith('M') and len(value) > 1:
+                            logger.info(f"  ✅ Regla {i+1}: Encontrado código Moura '{value}' en columna '{key}'")
+                        elif key.lower() in ['codigo', 'modelo', 'producto', 'articulo']:
+                            logger.info(f"  📋 Regla {i+1}: Columna '{key}' = '{value}'")
         
         # Convertir datos a productos
         productos = []
