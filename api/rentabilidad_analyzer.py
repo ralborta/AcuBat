@@ -529,14 +529,18 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
             logger.warning("⚠️ No se pudieron encontrar headers, usando fila de inicio + 1")
             fila_headers = fila_inicio + 1
         
-        # Encontrar las columnas relevantes de manera más flexible
+        # Encontrar las columnas relevantes de manera más inteligente
         headers = df.iloc[fila_headers, col_inicio:col_inicio + 15]
         col_publico = None
         col_markup = None
         col_rentabilidad = None
         
+        logger.info(f"🔍 Analizando headers: {list(headers)}")
+        
         for j, header in enumerate(headers):
             header_str = str(header).upper()
+            logger.info(f"  Columna {j}: '{header}' -> '{header_str}'")
+            
             if 'PUBLICO' in header_str or 'PUBLIC' in header_str:
                 col_publico = col_inicio + j
                 logger.info(f"📍 Columna Público encontrada: {header}")
@@ -547,7 +551,44 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                 col_rentabilidad = col_inicio + j
                 logger.info(f"📍 Columna Rentabilidad encontrada: {header}")
         
-        # Si no se encontraron columnas específicas, usar las primeras columnas
+        # Si no se encontraron columnas específicas, buscar por valores de porcentaje
+        if col_markup is None:
+            logger.info("🔍 Buscando columna de markup por valores de porcentaje...")
+            for j in range(len(headers)):
+                # Buscar en las primeras filas después del header para encontrar columnas con porcentajes
+                for i in range(fila_headers + 1, min(fila_headers + 10, len(df))):
+                    try:
+                        valor = str(df.iloc[i, col_inicio + j])
+                        if '%' in valor or (valor.replace('.', '').replace(',', '').isdigit() and float(valor.replace(',', '.')) > 0 and float(valor.replace(',', '.')) < 200):
+                            # Es un porcentaje válido
+                            col_markup = col_inicio + j
+                            logger.info(f"📍 Columna Markup encontrada por valor: {valor} en columna {j}")
+                            break
+                    except:
+                        continue
+                if col_markup is not None:
+                    break
+        
+        if col_rentabilidad is None:
+            logger.info("🔍 Buscando columna de rentabilidad por valores de porcentaje...")
+            for j in range(len(headers)):
+                if j == col_markup - col_inicio:  # Saltar la columna de markup
+                    continue
+                # Buscar en las primeras filas después del header para encontrar columnas con porcentajes
+                for i in range(fila_headers + 1, min(fila_headers + 10, len(df))):
+                    try:
+                        valor = str(df.iloc[i, col_inicio + j])
+                        if '%' in valor or (valor.replace('.', '').replace(',', '').isdigit() and float(valor.replace(',', '.')) > 0 and float(valor.replace(',', '.')) < 200):
+                            # Es un porcentaje válido
+                            col_rentabilidad = col_inicio + j
+                            logger.info(f"📍 Columna Rentabilidad encontrada por valor: {valor} en columna {j}")
+                            break
+                    except:
+                        continue
+                if col_rentabilidad is not None:
+                    break
+        
+        # Si aún no se encontraron, usar las primeras columnas
         if col_publico is None:
             col_publico = col_inicio
             logger.info(f"📍 Usando primera columna como Público: {col_inicio}")
@@ -558,6 +599,8 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
             col_rentabilidad = col_inicio + 3  # Cuarta columna típicamente
             logger.info(f"📍 Usando columna {col_inicio + 3} como Rentabilidad")
         
+        logger.info(f"✅ Columnas finales - Público: {col_publico}, Markup: {col_markup}, Rentabilidad: {col_rentabilidad}")
+        
         # Extraer datos de productos
         for i in range(fila_headers + 1, len(df)):
             try:
@@ -567,16 +610,23 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                 
                 # Solo procesar filas con datos válidos
                 if pd.notna(precio_publico) and pd.notna(markup) and markup != '#DIV/0!':
-                    regla = {
-                        'hoja': hoja_nombre,
-                        'canal': 'Minorista',
-                        'precio_publico': _convertir_precio(precio_publico),
-                        'markup': _convertir_porcentaje(markup),
-                        'rentabilidad': _convertir_porcentaje(rentabilidad),
-                        'fila': i
-                    }
-                    reglas.append(regla)
-                    logger.info(f"✅ Regla Minorista extraída: Precio=${regla['precio_publico']}, Markup={regla['markup']}%")
+                    markup_convertido = _convertir_porcentaje(markup)
+                    rentabilidad_convertida = _convertir_porcentaje(rentabilidad)
+                    
+                    # Validar que el markup sea razonable (entre 0% y 200%)
+                    if 0 <= markup_convertido <= 200:
+                        regla = {
+                            'hoja': hoja_nombre,
+                            'canal': 'Minorista',
+                            'precio_publico': _convertir_precio(precio_publico),
+                            'markup': markup_convertido,
+                            'rentabilidad': rentabilidad_convertida,
+                            'fila': i
+                        }
+                        reglas.append(regla)
+                        logger.info(f"✅ Regla Minorista extraída: Precio=${regla['precio_publico']}, Markup={regla['markup']}%")
+                    else:
+                        logger.warning(f"⚠️ Markup fuera de rango en fila {i}: {markup_convertido}%")
                     
             except Exception as e:
                 logger.warning(f"⚠️ Error procesando fila {i} en Minorista: {e}")
@@ -625,14 +675,18 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
             logger.warning("⚠️ No se pudieron encontrar headers, usando fila de inicio + 1")
             fila_headers = fila_inicio + 1
         
-        # Encontrar las columnas relevantes de manera más flexible
+        # Encontrar las columnas relevantes de manera más inteligente
         headers = df.iloc[fila_headers, col_inicio:col_inicio + 15]
         col_precio_base = None
         col_markup = None
         col_rentabilidad = None
         
+        logger.info(f"🔍 Analizando headers Mayorista: {list(headers)}")
+        
         for j, header in enumerate(headers):
             header_str = str(header).upper()
+            logger.info(f"  Columna {j}: '{header}' -> '{header_str}'")
+            
             if 'MAK' in header_str and 'UP' in header_str:
                 col_markup = col_inicio + j
                 logger.info(f"📍 Columna Markup encontrada: {header}")
@@ -643,7 +697,44 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                 col_precio_base = col_inicio + j
                 logger.info(f"📍 Usando primera columna como precio base: {header}")
         
-        # Si no se encontraron columnas específicas, usar las primeras columnas
+        # Si no se encontraron columnas específicas, buscar por valores de porcentaje
+        if col_markup is None:
+            logger.info("🔍 Buscando columna de markup por valores de porcentaje...")
+            for j in range(len(headers)):
+                # Buscar en las primeras filas después del header para encontrar columnas con porcentajes
+                for i in range(fila_headers + 1, min(fila_headers + 10, len(df))):
+                    try:
+                        valor = str(df.iloc[i, col_inicio + j])
+                        if '%' in valor or (valor.replace('.', '').replace(',', '').isdigit() and float(valor.replace(',', '.')) > 0 and float(valor.replace(',', '.')) < 200):
+                            # Es un porcentaje válido
+                            col_markup = col_inicio + j
+                            logger.info(f"📍 Columna Markup encontrada por valor: {valor} en columna {j}")
+                            break
+                    except:
+                        continue
+                if col_markup is not None:
+                    break
+        
+        if col_rentabilidad is None:
+            logger.info("🔍 Buscando columna de rentabilidad por valores de porcentaje...")
+            for j in range(len(headers)):
+                if j == col_markup - col_inicio:  # Saltar la columna de markup
+                    continue
+                # Buscar en las primeras filas después del header para encontrar columnas con porcentajes
+                for i in range(fila_headers + 1, min(fila_headers + 10, len(df))):
+                    try:
+                        valor = str(df.iloc[i, col_inicio + j])
+                        if '%' in valor or (valor.replace('.', '').replace(',', '').isdigit() and float(valor.replace(',', '.')) > 0 and float(valor.replace(',', '.')) < 200):
+                            # Es un porcentaje válido
+                            col_rentabilidad = col_inicio + j
+                            logger.info(f"📍 Columna Rentabilidad encontrada por valor: {valor} en columna {j}")
+                            break
+                    except:
+                        continue
+                if col_rentabilidad is not None:
+                    break
+        
+        # Si aún no se encontraron, usar las primeras columnas
         if col_precio_base is None:
             col_precio_base = col_inicio
             logger.info(f"📍 Usando primera columna como precio base: {col_inicio}")
@@ -654,6 +745,8 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
             col_rentabilidad = col_inicio + 3  # Cuarta columna típicamente
             logger.info(f"📍 Usando columna {col_inicio + 3} como Rentabilidad")
         
+        logger.info(f"✅ Columnas finales Mayorista - Precio Base: {col_precio_base}, Markup: {col_markup}, Rentabilidad: {col_rentabilidad}")
+        
         # Extraer datos de productos
         for i in range(fila_headers + 1, len(df)):
             try:
@@ -663,16 +756,23 @@ def _extraer_reglas_mayorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                 
                 # Solo procesar filas con datos válidos
                 if pd.notna(precio_base) and pd.notna(markup) and markup != '#DIV/0!':
-                    regla = {
-                        'hoja': hoja_nombre,
-                        'canal': 'Mayorista',
-                        'precio_base': _convertir_precio(precio_base),
-                        'markup': _convertir_porcentaje(markup),
-                        'rentabilidad': _convertir_porcentaje(rentabilidad),
-                        'fila': i
-                    }
-                    reglas.append(regla)
-                    logger.info(f"✅ Regla Mayorista extraída: Precio=${regla['precio_base']}, Markup={regla['markup']}%")
+                    markup_convertido = _convertir_porcentaje(markup)
+                    rentabilidad_convertida = _convertir_porcentaje(rentabilidad)
+                    
+                    # Validar que el markup sea razonable (entre 0% y 200%)
+                    if 0 <= markup_convertido <= 200:
+                        regla = {
+                            'hoja': hoja_nombre,
+                            'canal': 'Mayorista',
+                            'precio_base': _convertir_precio(precio_base),
+                            'markup': markup_convertido,
+                            'rentabilidad': rentabilidad_convertida,
+                            'fila': i
+                        }
+                        reglas.append(regla)
+                        logger.info(f"✅ Regla Mayorista extraída: Precio=${regla['precio_base']}, Markup={regla['markup']}%")
+                    else:
+                        logger.warning(f"⚠️ Markup fuera de rango en fila {i}: {markup_convertido}%")
                     
             except Exception as e:
                 logger.warning(f"⚠️ Error procesando fila {i} en Mayorista: {e}")
