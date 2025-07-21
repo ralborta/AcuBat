@@ -1005,10 +1005,20 @@ async def calcular_precios_con_rentabilidad():
         logger.info(f"Primer producto: {precios_hoja[0] if precios_hoja else 'No hay productos'}")
         logger.info(f"Primera regla: {rentabilidad_hoja[0] if rentabilidad_hoja else 'No hay reglas'}")
         
+        # Logging detallado de la estructura de datos
+        if precios_hoja:
+            logger.info(f"Claves del primer producto: {list(precios_hoja[0].keys())}")
+            logger.info(f"Valores del primer producto: {precios_hoja[0]}")
+        if rentabilidad_hoja:
+            logger.info(f"Claves de la primera regla: {list(rentabilidad_hoja[0].keys())}")
+            logger.info(f"Valores de la primera regla: {rentabilidad_hoja[0]}")
+        
         # Convertir datos a productos
         productos = []
-        for item in precios_hoja:
+        logger.info(f"🔄 Convirtiendo {len(precios_hoja)} productos...")
+        for i, item in enumerate(precios_hoja):
             try:
+                logger.info(f"  Procesando producto {i+1}: {item}")
                 producto = Producto(
                     codigo=str(item.get('codigo', '')),
                     nombre=str(item.get('nombre', '')),
@@ -1026,9 +1036,12 @@ async def calcular_precios_con_rentabilidad():
                     sugerencias_openai=''
                 )
                 productos.append(producto)
+                logger.info(f"  ✅ Producto {i+1} convertido exitosamente")
             except Exception as e:
-                logger.error(f"Error convirtiendo producto: {e}")
+                logger.error(f"Error convirtiendo producto {i+1}: {e}")
                 continue
+        
+        logger.info(f"✅ Total productos convertidos: {len(productos)}")
         
         # Procesar productos directamente con los datos en memoria
         logger.info("🔄 Procesando productos con datos en memoria...")
