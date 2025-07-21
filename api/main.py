@@ -1,3 +1,4 @@
+# FORZAR REBUILD - Vercel necesita detectar cambios en main.py para incluir rentabilidad_analyzer.py
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
