@@ -28,4 +28,4 @@ python run.py
 El proyecto está configurado para despliegue automático en Vercel.
 
 ---
-**Última actualización:** $(date) 
+**Última actualización:** $(date) # FORZAR DEPLOY
