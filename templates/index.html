@@ -1035,7 +1035,7 @@
             html += '</div>';
             
             // Tabla de productos
-            if (data.productos && data.productos.length > 0) {
+            if (data.productos_detalle && data.productos_detalle.length > 0) {
                 html += '<div class="card">';
                 html += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
                 html += '<div class="card-body">';
@@ -1054,7 +1054,7 @@
                 html += '</thead>';
                 html += '<tbody>';
                 
-                data.productos.forEach(producto => {
+                data.productos_detalle.forEach(producto => {
                     const estadoClass = producto.estado === 'OK' ? 'success' : 
                                       producto.estado === 'Revisar' ? 'warning' : 'danger';
                     const estadoIcon = producto.estado === 'OK' ? 'check-circle' : 
@@ -1065,7 +1065,7 @@
                     html += `<td>${producto.nombre}</td>`;
                     html += `<td>$${producto.precio_base.toFixed(2)}</td>`;
                     html += `<td>$${producto.precio_final.toFixed(2)}</td>`;
-                    html += `<td>${producto.margen_real}%</td>`;
+                    html += `<td>${producto.margen.toFixed(1)}%</td>`;
                     html += `<td><span class="badge bg-${estadoClass}"><i class="fas fa-${estadoIcon}"></i> ${producto.estado}</span></td>`;
                     html += `<td>${producto.alertas && Array.isArray(producto.alertas) && producto.alertas.length > 0 ? producto.alertas.join(', ') : '-'}</td>`;
                     html += '</tr>';

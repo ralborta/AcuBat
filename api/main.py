@@ -1140,10 +1140,25 @@ async def calcular_precios_con_rentabilidad():
         logger.info(f"✅ Proceso completado exitosamente - {len(productos_procesados)} productos")
         logger.info(f"📊 Resumen: {len(productos_procesados)} productos procesados de {len(productos)} originales")
         
+        # Convertir productos a diccionarios para JSON
+        productos_json = []
+        for producto in productos_procesados:
+            productos_json.append({
+                "codigo": producto.codigo,
+                "nombre": producto.nombre,
+                "precio_base": producto.precio_base,
+                "precio_final": producto.precio_final,
+                "margen": producto.margen,
+                "estado": producto.estado_rentabilidad,
+                "alertas": producto.alertas,
+                "markup_aplicado": producto.markup_aplicado
+            })
+        
         return {
             "status": "success",
             "mensaje": f"Proceso completado exitosamente para {len(productos_procesados)} productos",
             "productos": len(productos_procesados),
+            "productos_detalle": productos_json,  # Lista completa de productos
             "pasos_completados": pasos_completados,
             "resumen": {
                 "total_productos": len(productos_procesados),
