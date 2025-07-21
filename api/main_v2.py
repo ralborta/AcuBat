@@ -61,6 +61,17 @@ except ImportError as e:
     print(f"⚠️ Algunos módulos no están disponibles: {e}")
     MODULES_AVAILABLE = False
 
+@app.get("/test")
+async def test_endpoint():
+    """Endpoint de test simple"""
+    return {
+        "status": "success",
+        "message": "main_v2.py está funcionando correctamente",
+        "modules_available": MODULES_AVAILABLE,
+        "is_vercel": IS_VERCEL,
+        "version": "2.0.0"
+    }
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Página principal con panel de productos"""
@@ -254,15 +265,6 @@ async def index(request: Request):
         </body>
         </html>
         """)
-
-@app.get("/test")
-async def test_endpoint():
-    """Endpoint de prueba para verificar que la aplicación funciona"""
-    return {
-        "mensaje": "✅ API funcionando correctamente",
-        "timestamp": "2024-01-01T00:00:00Z",
-        "status": "ok"
-    }
 
 @app.get("/test-simple")
 async def test_simple():
