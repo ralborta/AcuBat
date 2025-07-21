@@ -1015,7 +1015,7 @@ async def calcular_precios_con_rentabilidad():
                     marca=Marca.MOURA,  # Por ahora solo Moura
                     canal=Canal.MINORISTA,  # Por defecto minorista
                     categoria='Baterías',
-                    precio_base=float(item.get('precio', 0)),
+                    precio_base=float(item.get('precio_base', item.get('precio', 0))),
                     precio_final=0,
                     margen=0,
                     markup_aplicado=0,
