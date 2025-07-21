@@ -1037,7 +1037,11 @@
             html += '</div>';
             
             // Tabla de productos
+            console.log('🔍 Verificando productos_detalle:', data.productos_detalle);
+            console.log('📊 Longitud de productos_detalle:', data.productos_detalle ? data.productos_detalle.length : 'No disponible');
+            
             if (data.productos_detalle && data.productos_detalle.length > 0) {
+                console.log('✅ Mostrando tabla de productos con', data.productos_detalle.length, 'productos');
                 html += '<div class="card">';
                 html += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
                 html += '<div class="card-body">';
@@ -1056,7 +1060,8 @@
                 html += '</thead>';
                 html += '<tbody>';
                 
-                data.productos_detalle.forEach(producto => {
+                data.productos_detalle.forEach((producto, index) => {
+                    console.log(`📋 Procesando producto ${index + 1}:`, producto);
                     const estadoClass = producto.estado === 'OK' ? 'success' : 
                                       producto.estado === 'Revisar' ? 'warning' : 'danger';
                     const estadoIcon = producto.estado === 'OK' ? 'check-circle' : 
@@ -1077,6 +1082,13 @@
                 html += '</table>';
                 html += '</div>';
                 html += '</div></div>';
+            } else {
+                console.log('❌ No hay productos_detalle disponibles');
+                html += '<div class="alert alert-warning">';
+                html += '<i class="fas fa-exclamation-triangle"></i> ';
+                html += 'No se pudieron mostrar los detalles de los productos. ';
+                html += 'Verifica la consola para más información.';
+                html += '</div>';
             }
             
             // Botones de acción
