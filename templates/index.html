@@ -519,6 +519,9 @@
                 <button class="btn btn-modern btn-info-modern" onclick="diagnosticoDetallado()" id="btnDetallado">
                     <i class="fas fa-microscope"></i> Ver Datos
                 </button>
+                <button class="btn btn-modern btn-secondary-modern" onclick="analizarPlanillaCompleja()" id="btnAnalizarCompleja">
+                    <i class="fas fa-brain"></i> Analizar Planilla Compleja
+                </button>
             </div>
             <div id="calculoStatus" style="display: none; margin-top: 1.5rem;"></div>
         </div>
@@ -1218,6 +1221,43 @@
             });
         }
 
+        function analizarPlanillaCompleja() {
+            // Crear input de archivo temporal
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx,.xls';
+            input.style.display = 'none';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                mostrarCarga('Analizando planilla compleja...');
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                fetch('/api/analizar-planilla-compleja', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    ocultarCarga();
+                    mostrarAnalisisPlanillaCompleja(data);
+                })
+                .catch(error => {
+                    ocultarCarga();
+                    mostrarAlerta('danger', '❌ Error analizando planilla compleja', 'calculoStatus');
+                    console.error('Error:', error);
+                });
+            };
+            
+            document.body.appendChild(input);
+            input.click();
+            document.body.removeChild(input);
+        }
+
         function mostrarDiagnostico(data) {
             const resultsSection = document.getElementById('resultsSection');
             const resultsContent = document.getElementById('resultsContent');
@@ -1365,6 +1405,137 @@
             html += '<p>• Identifica cuáles son código, nombre y precio</p>';
             html += '<p>• Verifica que los datos sean correctos</p>';
             html += '</div>';
+            
+            resultsContent.innerHTML = html;
+            resultsSection.style.display = 'block';
+        }
+
+        function mostrarAnalisisPlanillaCompleja(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = '<h4><i class="fas fa-brain"></i> Análisis de Planilla Compleja</h4>';
+            
+            if (data.status === 'success') {
+                const diagnostico = data.diagnostico;
+                const reglas = data.reglas_extraidas;
+                
+                // Resumen general
+                html += '<div class="card mb-4">';
+                html += '<div class="card-header">📊 Resumen del Análisis</div>';
+                html += '<div class="card-body">';
+                html += `<p><strong>Archivo:</strong> ${diagnostico.archivo}</p>`;
+                html += `<p><strong>Total de hojas:</strong> ${diagnostico.total_hojas}</p>`;
+                html += `<p><strong>Reglas encontradas:</strong> ${diagnostico.reglas_encontradas}</p>`;
+                html += `<p><strong>Problemas detectados:</strong> ${diagnostico.problemas_detectados.length}</p>`;
+                html += '</div></div>';
+                
+                // Análisis por hoja
+                if (diagnostico.hojas_analizadas && diagnostico.hojas_analizadas.length > 0) {
+                    html += '<div class="card mb-4">';
+                    html += '<div class="card-header">📋 Análisis por Hoja</div>';
+                    html += '<div class="card-body">';
+                    
+                    diagnostico.hojas_analizadas.forEach(hoja => {
+                        html += '<div class="mb-3 p-3 border rounded">';
+                        html += `<h6>📄 ${hoja.nombre}</h6>`;
+                        html += `<p><strong>Filas:</strong> ${hoja.filas}, <strong>Columnas:</strong> ${hoja.columnas}</p>`;
+                        
+                        if (hoja.posibles_margenes.length > 0) {
+                            html += `<p><strong>Posibles márgenes:</strong> ${hoja.posibles_margenes.join(', ')}</p>`;
+                        }
+                        
+                        if (hoja.posibles_canales.length > 0) {
+                            html += `<p><strong>Posibles canales:</strong> ${hoja.posibles_canales.join(', ')}</p>`;
+                        }
+                        
+                        if (hoja.problemas.length > 0) {
+                            html += '<div class="alert alert-warning">';
+                            html += '<strong>Problemas detectados:</strong>';
+                            html += '<ul>';
+                            hoja.problemas.forEach(problema => {
+                                html += `<li>${problema}</li>`;
+                            });
+                            html += '</ul>';
+                            html += '</div>';
+                        }
+                        
+                        html += '</div>';
+                    });
+                    
+                    html += '</div></div>';
+                }
+                
+                // Reglas extraídas
+                if (reglas && Object.keys(reglas).length > 0) {
+                    html += '<div class="card mb-4">';
+                    html += '<div class="card-header">✅ Reglas Extraídas</div>';
+                    html += '<div class="card-body">';
+                    
+                    Object.entries(reglas).forEach(([hoja, reglas_hoja]) => {
+                        html += `<h6>📊 ${hoja}</h6>`;
+                        html += '<div class="table-responsive">';
+                        html += '<table class="table table-sm table-striped">';
+                        html += '<thead><tr><th>Marca</th><th>Canal</th><th>Línea</th><th>Margen Mínimo</th><th>Margen Óptimo</th></tr></thead>';
+                        html += '<tbody>';
+                        
+                        reglas_hoja.forEach(regla => {
+                            html += '<tr>';
+                            html += `<td>${regla.marca}</td>`;
+                            html += `<td>${regla.canal}</td>`;
+                            html += `<td>${regla.linea}</td>`;
+                            html += `<td>${regla.margen_minimo}%</td>`;
+                            html += `<td>${regla.margen_optimo}%</td>`;
+                            html += '</tr>';
+                        });
+                        
+                        html += '</tbody></table></div>';
+                    });
+                    
+                    html += '</div></div>';
+                }
+                
+                // Problemas detectados
+                if (diagnostico.problemas_detectados && diagnostico.problemas_detectados.length > 0) {
+                    html += '<div class="card mb-4">';
+                    html += '<div class="card-header">⚠️ Problemas Detectados</div>';
+                    html += '<div class="card-body">';
+                    html += '<ul>';
+                    diagnostico.problemas_detectados.forEach(problema => {
+                        html += `<li>${problema}</li>`;
+                    });
+                    html += '</ul>';
+                    html += '</div></div>';
+                }
+                
+                // Recomendaciones
+                if (diagnostico.recomendaciones && diagnostico.recomendaciones.length > 0) {
+                    html += '<div class="card mb-4">';
+                    html += '<div class="card-header">💡 Recomendaciones</div>';
+                    html += '<div class="card-body">';
+                    html += '<ul>';
+                    diagnostico.recomendaciones.forEach(recomendacion => {
+                        html += `<li>${recomendacion}</li>`;
+                    });
+                    html += '</ul>';
+                    html += '</div></div>';
+                }
+                
+                // Botón para usar las reglas extraídas
+                if (diagnostico.reglas_encontradas > 0) {
+                    html += '<div class="alert alert-success">';
+                    html += '<h6><i class="fas fa-check-circle"></i> ¡Análisis Completado!</h6>';
+                    html += `<p>Se encontraron ${diagnostico.reglas_encontradas} reglas de rentabilidad.</p>`;
+                    html += '<p>Ahora puedes cargar tu archivo de precios y calcular con estas reglas.</p>';
+                    html += '</div>';
+                }
+                
+            } else {
+                html += '<div class="alert alert-danger">';
+                html += '<h6><i class="fas fa-exclamation-triangle"></i> Error en el Análisis</h6>';
+                html += `<p>${data.error || 'Error desconocido'}</p>`;
+                html += '</div>';
+            }
             
             resultsContent.innerHTML = html;
             resultsSection.style.display = 'block';
