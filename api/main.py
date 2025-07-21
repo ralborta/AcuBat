@@ -1136,3 +1136,42 @@ async def calcular_precios_con_rentabilidad():
             "status": "error",
             "mensaje": f"Error: {str(e)}"
         } 
+
+@app.get("/api/logs")
+async def obtener_logs():
+    """Endpoint para obtener logs del servidor"""
+    try:
+        # Capturar logs recientes
+        logs = []
+        
+        # Verificar estado de archivos
+        logs.append(f"📁 Estado de archivos:")
+        logs.append(f"  - precios_data: {'✅ Cargado' if precios_data else '❌ No cargado'}")
+        logs.append(f"  - rentabilidades_data: {'✅ Cargado' if rentabilidades_data else '❌ No cargado'}")
+        
+        if precios_data:
+            logs.append(f"  - Hojas de precios: {list(precios_data.keys())}")
+            for hoja, datos in precios_data.items():
+                logs.append(f"    - {hoja}: {len(datos)} productos")
+                if datos:
+                    logs.append(f"      Primer producto: {datos[0]}")
+        
+        if rentabilidades_data:
+            logs.append(f"  - Hojas de rentabilidad: {list(rentabilidades_data.keys())}")
+            for hoja, datos in rentabilidades_data.items():
+                logs.append(f"    - {hoja}: {len(datos)} reglas")
+                if datos:
+                    logs.append(f"      Primera regla: {datos[0]}")
+        
+        logs.append(f"📊 Productos actuales: {len(productos_actuales)}")
+        
+        return {
+            "status": "success",
+            "logs": logs
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "mensaje": f"Error obteniendo logs: {str(e)}"
+        } 
