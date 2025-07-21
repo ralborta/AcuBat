@@ -397,7 +397,7 @@ def _detectar_secciones_canales(df: pd.DataFrame, hoja_nombre: str) -> Dict[str,
                 valor = str(df.iloc[i, j]).strip().upper()
                 
                 # Detectar sección Minorista (P. Publico)
-                if 'PUBLICO' in valor and 'IVA' in valor:
+                if ('PUBLICO' in valor and 'IVA' in valor) or 'P. PUBLICO' in valor:
                     secciones['minorista'] = {
                         'fila_inicio': i,
                         'columna_inicio': j,
@@ -407,7 +407,7 @@ def _detectar_secciones_canales(df: pd.DataFrame, hoja_nombre: str) -> Dict[str,
                     break
                 
                 # Detectar sección Mayorista (P. Mayorista)
-                elif 'MAYORISTA' in valor and 'IVA' in valor:
+                elif ('MAYORISTA' in valor and 'IVA' in valor) or 'P. MAYORISTA' in valor:
                     secciones['mayorista'] = {
                         'fila_inicio': i,
                         'columna_inicio': j,
