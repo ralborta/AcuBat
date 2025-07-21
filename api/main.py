@@ -987,6 +987,8 @@ async def calcular_precios_con_rentabilidad():
                 "resumen": {}
             }
         
+        logger.info(f"📊 Archivos disponibles - Precios: {precios_filename}, Rentabilidades: {rentabilidades_filename}")
+        
         # Analizar el archivo de rentabilidades con la nueva función
         logger.info("🔍 Analizando archivo de rentabilidades con estructura de 2 canales")
         
@@ -995,10 +997,13 @@ async def calcular_precios_con_rentabilidad():
         if rentabilidades_filename:
             if os.path.exists(rentabilidades_filename):
                 rentabilidades_file_path = rentabilidades_filename
+                logger.info(f"✅ Archivo encontrado: {rentabilidades_filename}")
             elif os.path.exists(f"data/{rentabilidades_filename}"):
                 rentabilidades_file_path = f"data/{rentabilidades_filename}"
+                logger.info(f"✅ Archivo encontrado en data/: {rentabilidades_filename}")
             elif os.path.exists("Rentalibilidades-2.xlsx"):
                 rentabilidades_file_path = "Rentalibilidades-2.xlsx"
+                logger.info("✅ Usando archivo por defecto: Rentalibilidades-2.xlsx")
         
         if not rentabilidades_file_path:
             logger.error("❌ No se encontró el archivo de rentabilidades")
@@ -1012,8 +1017,19 @@ async def calcular_precios_con_rentabilidad():
             }
         
         # Analizar rentabilidades con la nueva función
-        analisis_rentabilidades = analizar_rentabilidades_2_canales(rentabilidades_file_path)
-        logger.info(f"📊 Análisis de rentabilidades: {analisis_rentabilidades['resumen']}")
+        try:
+            analisis_rentabilidades = analizar_rentabilidades_2_canales(rentabilidades_file_path)
+            logger.info(f"📊 Análisis de rentabilidades: {analisis_rentabilidades['resumen']}")
+        except Exception as e:
+            logger.error(f"❌ Error analizando rentabilidades: {e}")
+            return {
+                "status": "error",
+                "mensaje": f"Error analizando archivo de rentabilidades: {str(e)}",
+                "productos": 0,
+                "productos_detalle": [],
+                "pasos_completados": [],
+                "resumen": {}
+            }
         
         if not analisis_rentabilidades['reglas_minorista'] and not analisis_rentabilidades['reglas_mayorista']:
             logger.error("❌ No se encontraron reglas de rentabilidad")
@@ -1034,15 +1050,20 @@ async def calcular_precios_con_rentabilidad():
         precios_hoja = None
         if isinstance(precios_data, dict):
             # Si es un diccionario con hojas
+            logger.info(f"📋 Hojas disponibles en precios: {list(precios_data.keys())}")
             for hoja_nombre, datos in precios_data.items():
                 if 'moura' in hoja_nombre.lower():
                     precios_hoja = datos
+                    logger.info(f"✅ Usando hoja Moura: {hoja_nombre}")
                     break
             if not precios_hoja and precios_data:
-                precios_hoja = list(precios_data.values())[0]
+                primera_hoja = list(precios_data.keys())[0]
+                precios_hoja = precios_data[primera_hoja]
+                logger.info(f"✅ Usando primera hoja disponible: {primera_hoja}")
         else:
             # Si es una lista directa
             precios_hoja = precios_data
+            logger.info("✅ Usando datos de precios como lista directa")
         
         if not precios_hoja:
             logger.error("❌ No se encontró hoja de precios válida")
