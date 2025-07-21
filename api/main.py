@@ -6,6 +6,8 @@ import io
 import os
 import json
 from dotenv import load_dotenv
+import pandas as pd
+import traceback
 
 # Cargar variables de entorno
 load_dotenv()
@@ -42,7 +44,7 @@ try:
     from .openai_helper import OpenAIHelper
     from .parser import ExcelParser, detect_and_parse_file, is_moura_file
     from .models import Producto, Marca, Canal
-    from .rentabilidad_analyzer import RentabilidadAnalyzer
+    from .rentabilidad_analyzer import RentabilidadAnalyzer, analizar_rentabilidades_2_canales
     
     pricing_logic = PricingLogic()
     openai_helper = OpenAIHelper()
@@ -992,39 +994,68 @@ async def calcular_precios_con_rentabilidad():
         # Analizar el archivo de rentabilidades con la nueva función
         logger.info("🔍 Analizando archivo de rentabilidades con estructura de 2 canales")
         
-        # Usar el archivo físico si está disponible
-        rentabilidades_file_path = None
-        if rentabilidades_filename:
-            if os.path.exists(rentabilidades_filename):
-                rentabilidades_file_path = rentabilidades_filename
-                logger.info(f"✅ Archivo encontrado: {rentabilidades_filename}")
-            elif os.path.exists(f"data/{rentabilidades_filename}"):
-                rentabilidades_file_path = f"data/{rentabilidades_filename}"
-                logger.info(f"✅ Archivo encontrado en data/: {rentabilidades_filename}")
-            elif os.path.exists("Rentalibilidades-2.xlsx"):
-                rentabilidades_file_path = "Rentalibilidades-2.xlsx"
-                logger.info("✅ Usando archivo por defecto: Rentalibilidades-2.xlsx")
-        
-        if not rentabilidades_file_path:
-            logger.error("❌ No se encontró el archivo de rentabilidades")
+        # Usar los datos de rentabilidades que ya están cargados en memoria
+        # en lugar de buscar archivos hardcodeados
+        if not rentabilidades_data:
+            logger.error("❌ No hay datos de rentabilidades cargados")
             return {
                 "status": "error",
-                "mensaje": "No se encontró el archivo de rentabilidades. Asegúrate de que esté en el proyecto.",
+                "mensaje": "No hay datos de rentabilidades cargados. Sube primero el archivo de rentabilidades.",
                 "productos": 0,
                 "productos_detalle": [],
                 "pasos_completados": [],
                 "resumen": {}
             }
         
-        # Analizar rentabilidades con la nueva función
+        # Crear un archivo temporal con los datos cargados para analizarlo
+        import tempfile
+        temp_file = None
+        
         try:
-            analisis_rentabilidades = analizar_rentabilidades_2_canales(rentabilidades_file_path)
-            logger.info(f"📊 Análisis de rentabilidades: {analisis_rentabilidades['resumen']}")
+            # Crear archivo temporal con los datos de rentabilidades
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+            temp_filename = temp_file.name
+            
+            # Convertir los datos de rentabilidades a DataFrame y guardar
+            if isinstance(rentabilidades_data, dict):
+                # Si es un diccionario con hojas, usar la primera hoja
+                primera_hoja = list(rentabilidades_data.keys())[0]
+                df_rentabilidades = pd.DataFrame(rentabilidades_data[primera_hoja])
+            else:
+                # Si es una lista directa
+                df_rentabilidades = pd.DataFrame(rentabilidades_data)
+            
+            # Guardar como Excel temporal
+            df_rentabilidades.to_excel(temp_filename, index=False)
+            temp_file.close()
+            
+            logger.info(f"✅ Archivo temporal creado: {temp_filename}")
+            
+            # Analizar rentabilidades con la nueva función
+            try:
+                analisis_rentabilidades = analizar_rentabilidades_2_canales(temp_filename)
+                logger.info(f"📊 Análisis de rentabilidades: {analisis_rentabilidades['resumen']}")
+            except Exception as e:
+                logger.error(f"❌ Error analizando rentabilidades: {e}")
+                return {
+                    "status": "error",
+                    "mensaje": f"Error analizando archivo de rentabilidades: {str(e)}",
+                    "productos": 0,
+                    "productos_detalle": [],
+                    "pasos_completados": [],
+                    "resumen": {}
+                }
+            finally:
+                # Limpiar archivo temporal
+                if os.path.exists(temp_filename):
+                    os.unlink(temp_filename)
+                    logger.info("✅ Archivo temporal eliminado")
+        
         except Exception as e:
-            logger.error(f"❌ Error analizando rentabilidades: {e}")
+            logger.error(f"❌ Error creando archivo temporal: {e}")
             return {
                 "status": "error",
-                "mensaje": f"Error analizando archivo de rentabilidades: {str(e)}",
+                "mensaje": f"Error procesando datos de rentabilidades: {str(e)}",
                 "productos": 0,
                 "productos_detalle": [],
                 "pasos_completados": [],
