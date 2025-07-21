@@ -1036,10 +1036,11 @@
             html += '</div></div></div>';
             html += '</div>';
             
-            // Tabla de productos
+            // Tabla de productos - FORZAR VISUALIZACIÓN
             console.log('🔍 Verificando productos_detalle:', data.productos_detalle);
             console.log('📊 Longitud de productos_detalle:', data.productos_detalle ? data.productos_detalle.length : 'No disponible');
             
+            // FORZAR: Siempre mostrar tabla si hay productos
             if (data.productos_detalle && data.productos_detalle.length > 0) {
                 console.log('✅ Mostrando tabla de productos con', data.productos_detalle.length, 'productos');
                 html += '<div class="card">';
@@ -1084,6 +1085,7 @@
                 html += '</div></div>';
             } else {
                 console.log('❌ No hay productos_detalle disponibles');
+                console.log('🔍 Datos completos disponibles:', Object.keys(data));
                 html += '<div class="alert alert-warning">';
                 html += '<i class="fas fa-exclamation-triangle"></i> ';
                 html += 'No se pudieron mostrar los detalles de los productos. ';
