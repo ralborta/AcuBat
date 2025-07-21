@@ -966,21 +966,33 @@ async def calcular_precios_con_rentabilidad():
         hoja_precios = None
         hoja_rentabilidad = None
         
-        # Buscar Moura primero
+        # Buscar hoja "Moura" en rentabilidades
+        for hoja_rent in hojas_rentabilidad:
+            if 'moura' in hoja_rent.lower():
+                hoja_rentabilidad = hoja_rent
+                break
+        
+        # Si no hay hoja Moura en rentabilidades, usar la primera
+        if not hoja_rentabilidad:
+            hoja_rentabilidad = hojas_rentabilidad[0] if hojas_rentabilidad else None
+        
+        # Buscar cualquier hoja de precios que contenga productos Moura
+        # (códigos que empiecen con M)
         for hoja_precio in hojas_precios:
-            if 'moura' in hoja_precio.lower():
-                for hoja_rent in hojas_rentabilidad:
-                    if 'moura' in hoja_rent.lower():
+            precios_hoja_temp = precios_data[hoja_precio]
+            if precios_hoja_temp:
+                # Verificar si hay productos con códigos que empiecen con M (Moura)
+                for producto in precios_hoja_temp[:5]:  # Revisar solo los primeros 5
+                    codigo = str(producto.get('CODIGO BATERIAS', '')).strip()
+                    if codigo and codigo.startswith('M') and len(codigo) > 1:
                         hoja_precios = hoja_precio
-                        hoja_rentabilidad = hoja_rent
                         break
                 if hoja_precios:
                     break
         
-        # Si no hay Moura, usar las primeras hojas disponibles
+        # Si no se encuentra hoja con productos Moura, usar la primera
         if not hoja_precios:
             hoja_precios = hojas_precios[0] if hojas_precios else None
-            hoja_rentabilidad = hojas_rentabilidad[0] if hojas_rentabilidad else None
         
         if not hoja_precios:
             return {
@@ -1019,24 +1031,34 @@ async def calcular_precios_con_rentabilidad():
         for i, item in enumerate(precios_hoja):
             try:
                 logger.info(f"  Procesando producto {i+1}: {item}")
-                producto = Producto(
-                    codigo=str(item.get('codigo', '')),
-                    nombre=str(item.get('nombre', '')),
-                    marca=Marca.MOURA,  # Por ahora solo Moura
-                    canal=Canal.MINORISTA,  # Por defecto minorista
-                    categoria='Baterías',
-                    precio_base=float(item.get('precio_base', item.get('precio', 0))),
-                    precio_final=0,
-                    margen=0,
-                    markup_aplicado=0,
-                    estado_rentabilidad='',
-                    margen_minimo_esperado=0,
-                    margen_optimo_esperado=0,
-                    alertas=[],
-                    sugerencias_openai=''
-                )
-                productos.append(producto)
-                logger.info(f"  ✅ Producto {i+1} convertido exitosamente")
+                # Extraer datos del archivo de precios
+                codigo = str(item.get('CODIGO BATERIAS', '')).strip()
+                nombre = str(item.get('DENOMINACION COMERCIAL / ALGUNAS APLICACIONES (4)', '')).strip()
+                precio_lista = item.get('Precio de Lista', 0)
+                
+                # Solo procesar productos válidos (con código y precio)
+                if codigo and codigo != 'nan' and precio_lista and precio_lista != 'nan':
+                    producto = Producto(
+                        codigo=codigo,
+                        nombre=nombre if nombre != 'nan' else f'Producto {codigo}',
+                        marca=Marca.MOURA,  # Por ahora solo Moura
+                        canal=Canal.MINORISTA,  # Por defecto minorista
+                        categoria='Baterías',
+                        precio_base=float(precio_lista),
+                        precio_final=0,
+                        margen=0,
+                        markup_aplicado=0,
+                        estado_rentabilidad='',
+                        margen_minimo_esperado=0,
+                        margen_optimo_esperado=0,
+                        alertas=[],
+                        sugerencias_openai=''
+                    )
+                    productos.append(producto)
+                    logger.info(f"  ✅ Producto {i+1} convertido: {codigo} - ${precio_lista}")
+                else:
+                    logger.info(f"  ⚠️ Producto {i+1} saltado: código='{codigo}', precio='{precio_lista}'")
+                    continue
             except Exception as e:
                 logger.error(f"Error convirtiendo producto {i+1}: {e}")
                 continue
