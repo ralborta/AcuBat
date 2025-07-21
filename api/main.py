@@ -42,10 +42,12 @@ try:
     from .openai_helper import OpenAIHelper
     from .parser import ExcelParser, detect_and_parse_file, is_moura_file
     from .models import Producto, Marca, Canal
+    from .rentabilidad_analyzer import RentabilidadAnalyzer
     
     pricing_logic = PricingLogic()
     openai_helper = OpenAIHelper()
     excel_parser = ExcelParser()
+    rentabilidad_analyzer = RentabilidadAnalyzer()
     
     MODULES_AVAILABLE = True
     logger.info("✅ Módulos completos cargados exitosamente")
@@ -726,6 +728,39 @@ async def diagnostico_detallado():
             "error": str(e),
             "precios": {"cargado": False, "datos_ejemplo": []},
             "rentabilidades": {"cargado": False, "datos_ejemplo": []}
+        }
+
+@app.post("/api/analizar-planilla-compleja")
+async def analizar_planilla_compleja(file: UploadFile = File(...)):
+    """Endpoint para analizar planillas de rentabilidad complejas"""
+    try:
+        logger.info(f"🔍 Analizando planilla compleja: {file.filename}")
+        
+        # Guardar archivo temporalmente
+        temp_path = f"/tmp/{file.filename}"
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Analizar la planilla
+        diagnostico = rentabilidad_analyzer.analizar_planilla_compleja(temp_path)
+        
+        # Limpiar archivo temporal
+        os.remove(temp_path)
+        
+        logger.info(f"✅ Análisis completado: {diagnostico.get('reglas_encontradas', 0)} reglas encontradas")
+        
+        return {
+            'status': 'success',
+            'diagnostico': diagnostico,
+            'reglas_extraidas': rentabilidad_analyzer.obtener_reglas_extraidas()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analizando planilla compleja: {e}")
+        return {
+            'status': 'error',
+            'error': str(e)
         }
 
 @app.get("/api/estado-rentabilidad")
