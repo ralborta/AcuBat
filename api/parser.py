@@ -424,6 +424,8 @@ def detect_and_parse_file(file_path: str) -> List[Dict]:
     Detecta el tipo de archivo y usa el parser apropiado
     """
     try:
+        logger.info(f"🔍 Detectando tipo de archivo: {file_path}")
+        
         # Verificar si es un archivo MOURA
         if is_moura_file(file_path):
             logger.info("Archivo MOURA detectado, usando parser específico")
@@ -433,10 +435,47 @@ def detect_and_parse_file(file_path: str) -> List[Dict]:
                 logger.warning("Parser MOURA no disponible, usando parser genérico")
         
         # Usar parser genérico para otros archivos
-        return parse_excel_file(file_path)
+        logger.info("Usando parser genérico")
+        return parse_excel_file_generic(file_path)
         
     except Exception as e:
         logger.error(f"Error en detección y parsing: {str(e)}")
+        raise
+
+def parse_excel_file_generic(file_path: str) -> List[Dict]:
+    """
+    Parser genérico para archivos Excel
+    """
+    try:
+        logger.info(f"📊 Parseando archivo genérico: {file_path}")
+        
+        # Leer todas las hojas del archivo
+        excel_file = pd.ExcelFile(file_path)
+        logger.info(f"Hojas encontradas: {excel_file.sheet_names}")
+        
+        all_data = {}
+        
+        for sheet_name in excel_file.sheet_names:
+            try:
+                logger.info(f"Procesando hoja: {sheet_name}")
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                
+                # Convertir DataFrame a lista de diccionarios
+                data = df.to_dict('records')
+                logger.info(f"  - {len(data)} registros encontrados en {sheet_name}")
+                
+                if data:
+                    all_data[sheet_name] = data
+                    
+            except Exception as e:
+                logger.error(f"Error procesando hoja {sheet_name}: {e}")
+                continue
+        
+        logger.info(f"✅ Total de hojas procesadas: {len(all_data)}")
+        return all_data
+        
+    except Exception as e:
+        logger.error(f"Error parseando archivo genérico: {e}")
         raise
 
 def is_moura_file(file_path: str) -> bool:
