@@ -1001,8 +1001,79 @@
                 html += '</div>';
             }
             
-            resultsContent.innerHTML = html;
-            resultsSection.style.display = 'block';
+            // Tabla de productos - AGREGAR A MOSTRAR PASOS COMPLETADOS
+            console.log('🔍 Verificando productos_detalle en mostrarPasosCompletados:', data.productos_detalle);
+            console.log('📊 Longitud de productos_detalle:', data.productos_detalle ? data.productos_detalle.length : 'No disponible');
+            
+            if (data.productos_detalle && data.productos_detalle.length > 0) {
+                console.log('✅ Mostrando tabla de productos con', data.productos_detalle.length, 'productos');
+                html += '<div class="card">';
+                html += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
+                html += '<div class="card-body">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-striped table-hover">';
+                html += '<thead class="table-dark">';
+                html += '<tr>';
+                html += '<th>Código</th>';
+                html += '<th>Nombre</th>';
+                html += '<th>Precio Base</th>';
+                html += '<th>Precio Final</th>';
+                html += '<th>Margen</th>';
+                html += '<th>Estado</th>';
+                html += '<th>Alertas</th>';
+                html += '</tr>';
+                html += '</thead>';
+                html += '<tbody>';
+                
+                data.productos_detalle.forEach((producto, index) => {
+                    console.log(`📋 Procesando producto ${index + 1}:`, producto);
+                    const estadoClass = producto.estado === 'OK' ? 'success' : 
+                                      producto.estado === 'Revisar' ? 'warning' : 'danger';
+                    const estadoIcon = producto.estado === 'OK' ? 'check-circle' : 
+                                     producto.estado === 'Revisar' ? 'exclamation-triangle' : 'times-circle';
+                    
+                    html += '<tr>';
+                    html += `<td><strong>${producto.codigo}</strong></td>`;
+                    html += `<td>${producto.nombre}</td>`;
+                    html += `<td>$${producto.precio_base.toFixed(2)}</td>`;
+                    html += `<td>$${producto.precio_final.toFixed(2)}</td>`;
+                    html += `<td>${producto.margen.toFixed(1)}%</td>`;
+                    html += `<td><span class="badge bg-${estadoClass}"><i class="fas fa-${estadoIcon}"></i> ${producto.estado}</span></td>`;
+                    html += `<td>${producto.alertas && Array.isArray(producto.alertas) && producto.alertas.length > 0 ? producto.alertas.join(', ') : '-'}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
+                html += '</div></div>';
+            } else {
+                console.log('❌ No hay productos_detalle disponibles en mostrarPasosCompletados');
+                html += '<div class="alert alert-warning">';
+                html += '<i class="fas fa-exclamation-triangle"></i> ';
+                html += 'No se pudieron mostrar los detalles de los productos. ';
+                html += 'Verifica la consola para más información.';
+                html += '</div>';
+            }
+            
+            console.log('🔍 Elementos DOM encontrados:');
+            console.log('  - resultsSection:', resultsSection);
+            console.log('  - resultsContent:', resultsContent);
+            console.log('📋 HTML generado (primeros 500 caracteres):', html.substring(0, 500));
+            
+            if (resultsContent) {
+                resultsContent.innerHTML = html;
+                console.log('✅ HTML insertado en resultsContent');
+            } else {
+                console.log('❌ resultsContent no encontrado');
+            }
+            
+            if (resultsSection) {
+                resultsSection.style.display = 'block';
+                console.log('✅ resultsSection mostrado');
+            } else {
+                console.log('❌ resultsSection no encontrado');
+            }
         }
 
         function mostrarResultados(data) {
