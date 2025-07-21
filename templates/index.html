@@ -894,7 +894,7 @@
                     ocultarCarga();
                     if (data.status === 'success') {
                         mostrarAlerta('success', `✅ ${data.mensaje}`, 'calculoStatus');
-                        mostrarPasosCompletados(data.pasos_completados, data.resumen);
+                        mostrarPasosCompletados(data.pasos_completados, data.resumen, data);
                         
                         const totalProductos = data.resumen?.total_productos || data.productos || '0';
                         console.log('📊 Total productos a mostrar:', totalProductos);
@@ -911,7 +911,7 @@
             }, 500);
         }
 
-        function mostrarPasosCompletados(pasos, resumen) {
+        function mostrarPasosCompletados(pasos, resumen, data) {
             const resultsSection = document.getElementById('resultsSection');
             const resultsContent = document.getElementById('resultsContent');
             
@@ -977,6 +977,8 @@
             html += '</div></div>';
             
             // Mostrar resumen
+            console.log('🔍 Datos completos recibidos en mostrarPasosCompletados:', data);
+            console.log('📋 Productos detalle disponibles:', data.productos_detalle ? data.productos_detalle.length : 'No disponible');
             if (resumen) {
                 html += '<div class="row mb-4">';
                 html += '<div class="col-md-6">';
