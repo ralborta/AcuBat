@@ -1,3 +1,4 @@
+# FIX CONFLICTO: Eliminar functions del vercel.json - Solo usar builds - Commit f5f7a2a
 # FORZAR DEPLOY: Importaciones absolutas para Vercel - Commit ed5b97a
 # FORZAR DEPLOY: Cambio de rewrites a routes en vercel.json - Commit 7dbe87f
 # FORZAR DEPLOY FINAL: JSON simplificado - Commit 6728e77 - Vercel debe reconocer este código
