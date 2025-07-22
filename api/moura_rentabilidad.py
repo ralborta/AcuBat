@@ -40,40 +40,69 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
         reglas_minorista = []
         reglas_mayorista = []
         
-        # Según el diagnóstico, las columnas están en:
-        # Línea 2 (fila 1): 
-        # - Columna 16: MARK-UP (Minorista)
-        # - Columna 17: RENT (Rentabilidad Minorista)
-        # - Columna 25: MARK-UP (Mayorista)
-        # - Columna 26: RENTABILIDAD (Rentabilidad Mayorista)
+        # Buscar dinámicamente las columnas MARK-UP y RENT
+        col_markup_minorista = None
+        col_rent_minorista = None
+        col_markup_mayorista = None
+        col_rent_mayorista = None
         
+        # Buscar en la fila de headers (línea 2, fila 1)
         fila_headers = 1  # Línea 2
         
-        if len(df_moura) <= fila_headers:
-            logger.error("❌ No hay suficientes filas en la hoja Moura")
-            logger.info(f"Primeras filas encontradas: {df_moura.head(5).to_dict()}")
-            return {
-                'reglas_minorista': [],
-                'reglas_mayorista': [],
-                'resumen': f"Error: Estructura insuficiente. Filas encontradas: {df_moura.head(5).to_dict()}"
-            }
+        logger.info(f"🔍 Buscando columnas MARK-UP y RENT dinámicamente en fila {fila_headers + 1}:")
         
-        # Mostrar las primeras 3 filas y todas las columnas para diagnóstico
-        logger.info(f"Primeras 3 filas de Moura:")
-        for i in range(min(3, len(df_moura))):
-            logger.info(f"Fila {i}: {[str(df_moura.iloc[i, j]) for j in range(len(df_moura.columns))]}")
-        logger.info(f"Columnas detectadas: {list(df_moura.columns)}")
+        # Buscar columnas por contenido
+        for j in range(len(df_moura.columns)):
+            try:
+                valor = str(df_moura.iloc[fila_headers, j]).strip().upper()
+                logger.info(f"  Columna {j}: '{valor}'")
+                
+                # Buscar MARK-UP (Minorista)
+                if 'MARK' in valor and 'UP' in valor and col_markup_minorista is None:
+                    col_markup_minorista = j
+                    logger.info(f"    ✅ MARK-UP Minorista encontrado en columna {j}")
+                
+                # Buscar RENT (Minorista)
+                elif 'RENT' in valor and col_rent_minorista is None and col_markup_minorista is not None:
+                    col_rent_minorista = j
+                    logger.info(f"    ✅ RENT Minorista encontrado en columna {j}")
+                
+                # Buscar segundo MARK-UP (Mayorista)
+                elif 'MARK' in valor and 'UP' in valor and col_markup_minorista is not None and col_markup_mayorista is None:
+                    col_markup_mayorista = j
+                    logger.info(f"    ✅ MARK-UP Mayorista encontrado en columna {j}")
+                
+                # Buscar RENTABILIDAD (Mayorista)
+                elif 'RENTABILIDAD' in valor and col_rent_mayorista is None:
+                    col_rent_mayorista = j
+                    logger.info(f"    ✅ RENTABILIDAD Mayorista encontrado en columna {j}")
+                    
+            except Exception as e:
+                logger.warning(f"    ⚠️ Error procesando columna {j}: {e}")
+                continue
         
-        col_markup_minorista = 16  # MARK-UP Minorista
-        col_rent_minorista = 17    # RENT Minorista
-        col_markup_mayorista = 25  # MARK-UP Mayorista
-        col_rent_mayorista = 26    # RENTABILIDAD Mayorista
+        # Si no se encontraron, usar las posiciones originales como fallback
+        if col_markup_minorista is None and 16 < len(df_moura.columns):
+            col_markup_minorista = 16
+            logger.info(f"    ⚠️ Usando posición fallback para MARK-UP Minorista: {col_markup_minorista}")
         
-        logger.info(f"📊 Verificando columnas en fila {fila_headers + 1}:")
-        logger.info(f"  Columna 16 (MARK-UP Minorista): {df_moura.iloc[fila_headers, col_markup_minorista] if col_markup_minorista < len(df_moura.columns) else 'NO EXISTE'}")
-        logger.info(f"  Columna 17 (RENT Minorista): {df_moura.iloc[fila_headers, col_rent_minorista] if col_rent_minorista < len(df_moura.columns) else 'NO EXISTE'}")
-        logger.info(f"  Columna 25 (MARK-UP Mayorista): {df_moura.iloc[fila_headers, col_markup_mayorista] if col_markup_mayorista < len(df_moura.columns) else 'NO EXISTE'}")
-        logger.info(f"  Columna 26 (RENTABILIDAD Mayorista): {df_moura.iloc[fila_headers, col_rent_mayorista] if col_rent_mayorista < len(df_moura.columns) else 'NO EXISTE'}")
+        if col_rent_minorista is None and 17 < len(df_moura.columns):
+            col_rent_minorista = 17
+            logger.info(f"    ⚠️ Usando posición fallback para RENT Minorista: {col_rent_minorista}")
+        
+        if col_markup_mayorista is None and 25 < len(df_moura.columns):
+            col_markup_mayorista = 25
+            logger.info(f"    ⚠️ Usando posición fallback para MARK-UP Mayorista: {col_markup_mayorista}")
+        
+        if col_rent_mayorista is None and 26 < len(df_moura.columns):
+            col_rent_mayorista = 26
+            logger.info(f"    ⚠️ Usando posición fallback para RENTABILIDAD Mayorista: {col_rent_mayorista}")
+        
+        logger.info(f"📊 Columnas finales detectadas:")
+        logger.info(f"  MARK-UP Minorista: {col_markup_minorista} - Valor: {df_moura.iloc[fila_headers, col_markup_minorista] if col_markup_minorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  RENT Minorista: {col_rent_minorista} - Valor: {df_moura.iloc[fila_headers, col_rent_minorista] if col_rent_minorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  MARK-UP Mayorista: {col_markup_mayorista} - Valor: {df_moura.iloc[fila_headers, col_markup_mayorista] if col_markup_mayorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  RENTABILIDAD Mayorista: {col_rent_mayorista} - Valor: {df_moura.iloc[fila_headers, col_rent_mayorista] if col_rent_mayorista is not None else 'NO ENCONTRADO'}")
         
         # Procesar productos desde la línea 3 (fila 2) en adelante
         for i in range(fila_headers + 1, len(df_moura)):
