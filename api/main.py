@@ -985,85 +985,45 @@ async def calcular_precios_con_rentabilidad():
     try:
         logger.info("🚀 Iniciando cálculo de precios con estructura de 2 canales")
         
-        # Verificar que tenemos los archivos cargados
-        if not precios_data or not rentabilidades_data:
-            logger.error("❌ No hay archivos cargados")
+        # Verificar que tenemos el archivo de precios cargado
+        if not precios_data:
+            logger.error("❌ No hay archivo de precios cargado")
             return {
                 "status": "error",
-                "mensaje": "No hay archivos cargados. Sube primero los archivos de precios y rentabilidades.",
+                "mensaje": "No hay archivo de precios cargado. Sube primero el archivo de precios.",
                 "productos": 0,
                 "productos_detalle": [],
                 "pasos_completados": [],
                 "resumen": {}
             }
         
-        logger.info(f"📊 Archivos disponibles - Precios: {precios_filename}, Rentabilidades: {rentabilidades_filename}")
+        logger.info(f"📊 Archivo de precios disponible: {precios_filename}")
         
-        # Analizar el archivo de rentabilidades con la nueva función
-        logger.info("🔍 Analizando archivo de rentabilidades con estructura de 2 canales")
+        # Usar directamente el archivo de rentabilidades de la raíz
+        archivo_rentabilidades = "Rentalibilidades-2.xlsx"
         
-        # Usar los datos de rentabilidades que ya están cargados en memoria
-        # en lugar de buscar archivos hardcodeados
-        if not rentabilidades_data:
-            logger.error("❌ No hay datos de rentabilidades cargados")
+        if not os.path.exists(archivo_rentabilidades):
+            logger.error(f"❌ No se encontró el archivo de rentabilidades: {archivo_rentabilidades}")
             return {
                 "status": "error",
-                "mensaje": "No hay datos de rentabilidades cargados. Sube primero el archivo de rentabilidades.",
+                "mensaje": f"No se encontró el archivo de rentabilidades: {archivo_rentabilidades}",
                 "productos": 0,
                 "productos_detalle": [],
                 "pasos_completados": [],
                 "resumen": {}
             }
         
-        # Crear un archivo temporal con los datos cargados para analizarlo
-        import tempfile
-        temp_file = None
+        logger.info(f"✅ Usando archivo de rentabilidades: {archivo_rentabilidades}")
         
+        # Analizar rentabilidades con el parser específico de Moura
         try:
-            # Crear archivo temporal con los datos de rentabilidades
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-            temp_filename = temp_file.name
-            
-            # Convertir los datos de rentabilidades a DataFrame y guardar
-            if isinstance(rentabilidades_data, dict):
-                # Si es un diccionario con hojas, usar la primera hoja
-                primera_hoja = list(rentabilidades_data.keys())[0]
-                df_rentabilidades = pd.DataFrame(rentabilidades_data[primera_hoja])
-            else:
-                # Si es una lista directa
-                df_rentabilidades = pd.DataFrame(rentabilidades_data)
-            
-            # Guardar como Excel temporal
-            df_rentabilidades.to_excel(temp_filename, index=False)
-            temp_file.close()
-            
-            logger.info(f"✅ Archivo temporal creado: {temp_filename}")
-            
-            # Analizar rentabilidades con el parser específico de Moura
-            try:
-                analisis_rentabilidades = analizar_rentabilidades_moura(temp_filename)
-                logger.info(f"📊 Análisis de rentabilidades Moura: {analisis_rentabilidades['resumen']}")
-            except Exception as e:
-                logger.error(f"❌ Error analizando rentabilidades Moura: {e}")
-                return {
-                    "status": "error",
-                    "mensaje": f"Error analizando archivo de rentabilidades Moura: {str(e)}",
-                    "productos": 0,
-                    "productos_detalle": [],
-                    "pasos_completados": [],
-                    "resumen": {}
-                }
-            finally:
-                # Limpiar archivo temporal
-                if os.path.exists(temp_filename):
-                    os.unlink(temp_filename)
-                    logger.info("✅ Archivo temporal eliminado")
-        
+            analisis_rentabilidades = analizar_rentabilidades_moura(archivo_rentabilidades)
+            logger.info(f"📊 Análisis de rentabilidades Moura: {analisis_rentabilidades['resumen']}")
         except Exception as e:
-            logger.error(f"❌ Error creando archivo temporal: {e}")
+            logger.error(f"❌ Error analizando rentabilidades Moura: {e}")
             return {
                 "status": "error",
-                "mensaje": f"Error procesando datos de rentabilidades: {str(e)}",
+                "mensaje": f"Error analizando archivo de rentabilidades Moura: {str(e)}",
                 "productos": 0,
                 "productos_detalle": [],
                 "pasos_completados": [],
@@ -1233,8 +1193,8 @@ async def calcular_precios_con_rentabilidad():
         productos_actuales = productos_procesados
         
         pasos_completados = [
-            "✅ Archivos cargados",
-            "✅ Análisis de rentabilidades con 2 canales",
+            "✅ Archivo de precios cargado",
+            "✅ Reglas de rentabilidad cargadas desde archivo local",
             "✅ Productos convertidos",
             "✅ Reglas de rentabilidad aplicadas por canal",
             "✅ Precios calculados para Minorista y Mayorista",
@@ -1250,32 +1210,30 @@ async def calcular_precios_con_rentabilidad():
         margen_promedio_minorista = sum([p['canales']['minorista']['margen'] for p in productos_procesados if 'minorista' in p['canales']]) / total_minorista if total_minorista > 0 else 0
         margen_promedio_mayorista = sum([p['canales']['mayorista']['margen'] for p in productos_procesados if 'mayorista' in p['canales']]) / total_mayorista if total_mayorista > 0 else 0
         
+        resumen = {
+            'total_productos': len(productos_procesados),
+            'total_minorista': total_minorista,
+            'total_mayorista': total_mayorista,
+            'margen_promedio_minorista': round(margen_promedio_minorista, 2),
+            'margen_promedio_mayorista': round(margen_promedio_mayorista, 2),
+            'archivo_precios': precios_filename,
+            'archivo_rentabilidades': archivo_rentabilidades,
+            'reglas_cargadas': len(analisis_rentabilidades['reglas_minorista']) + len(analisis_rentabilidades['reglas_mayorista'])
+        }
+        
         return {
             "status": "success",
-            "mensaje": f"Proceso completado exitosamente para {len(productos_procesados)} productos con 2 canales",
+            "mensaje": f"✅ Proceso completado exitosamente - {len(productos_procesados)} productos procesados",
             "productos": len(productos_procesados),
-            "productos_detalle": productos_procesados,
+            "productos_detalle": productos_procesados[:10],  # Solo los primeros 10 para la respuesta
             "pasos_completados": pasos_completados,
-            "resumen": {
-                "total_productos": len(productos_procesados),
-                "canal_minorista": {
-                    "productos": total_minorista,
-                    "margen_promedio": margen_promedio_minorista
-                },
-                "canal_mayorista": {
-                    "productos": total_mayorista,
-                    "margen_promedio": margen_promedio_mayorista
-                },
-                "reglas_detectadas": {
-                    "minorista": len(analisis_rentabilidades['reglas_minorista']),
-                    "mayorista": len(analisis_rentabilidades['reglas_mayorista'])
-                }
-            }
+            "resumen": resumen
         }
         
     except Exception as e:
         logger.error(f"❌ Error en cálculo de precios: {e}")
-        logger.error(traceback.format_exc())
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             "status": "error",
             "mensaje": f"Error en el cálculo: {str(e)}",
