@@ -390,98 +390,89 @@ def _detectar_secciones_canales(df: pd.DataFrame, hoja_nombre: str) -> Dict[str,
     logger.info(f"🔍 Buscando secciones en hoja: {hoja_nombre}")
     logger.info(f"📏 Dimensiones de la hoja: {df.shape}")
     
-    # Verificar si es una de las hojas que sabemos que tienen la estructura correcta
-    hojas_con_estructura = ["Tempel - Melisam", "Terminales - Liquimoly - Bari"]
-    
-    if hoja_nombre in hojas_con_estructura:
-        logger.info(f"✅ Hoja conocida con estructura: {hoja_nombre}")
-        
-        # Buscar títulos de secciones de manera más flexible
-        for i in range(min(len(df), 10)):  # Buscar en las primeras 10 filas
-            for j in range(min(len(df.columns), 30)):  # Buscar en las primeras 30 columnas
-                try:
-                    valor = str(df.iloc[i, j]).strip().upper()
-                    
-                    # Detectar sección Minorista (P. Publico)
-                    if 'P. PUBLICO' in valor or 'PUBLICO' in valor:
-                        secciones['minorista'] = {
-                            'fila_inicio': i,
-                            'columna_inicio': j,
-                            'titulo': valor
-                        }
-                        logger.info(f"📍 Sección Minorista detectada en fila {i}, columna {j}: {valor}")
-                        break
-                    
-                    # Detectar sección Mayorista (P. Mayorista)
-                    elif 'P. MAYORISTA' in valor or 'MAYORISTA' in valor:
-                        secciones['mayorista'] = {
-                            'fila_inicio': i,
-                            'columna_inicio': j,
-                            'titulo': valor
-                        }
-                        logger.info(f"📍 Sección Mayorista detectada en fila {i}, columna {j}: {valor}")
-                        break
-                            
-                except Exception as e:
-                    continue
-        
-        # Si no se detectaron secciones, buscar por patrones más específicos
-        if not secciones:
-            logger.info("🔍 No se detectaron secciones por título, buscando por patrones...")
-            
-            # Buscar columnas que contengan "P. Publico" o "P. Mayorista"
-            for j, col_name in enumerate(df.columns):
-                col_str = str(col_name).upper()
-                if 'P. PUBLICO' in col_str or 'PUBLICO' in col_str:
+    # Buscar títulos de secciones de manera más flexible en cualquier hoja
+    for i in range(min(len(df), 10)):  # Buscar en las primeras 10 filas
+        for j in range(min(len(df.columns), 30)):  # Buscar en las primeras 30 columnas
+            try:
+                valor = str(df.iloc[i, j]).strip().upper()
+                
+                # Detectar sección Minorista (P. Publico)
+                if 'P. PUBLICO' in valor or 'PUBLICO' in valor or 'MINORISTA' in valor:
                     secciones['minorista'] = {
-                        'fila_inicio': 0,
+                        'fila_inicio': i,
                         'columna_inicio': j,
-                        'titulo': str(col_name)
+                        'titulo': valor
                     }
-                    logger.info(f"📍 Sección Minorista detectada por columna: {col_name}")
+                    logger.info(f"📍 Sección Minorista detectada en fila {i}, columna {j}: {valor}")
                     break
-                elif 'P. MAYORISTA' in col_str or 'MAYORISTA' in col_str:
+                
+                # Detectar sección Mayorista (P. Mayorista)
+                elif 'P. MAYORISTA' in valor or 'MAYORISTA' in valor:
                     secciones['mayorista'] = {
-                        'fila_inicio': 0,
+                        'fila_inicio': i,
                         'columna_inicio': j,
-                        'titulo': str(col_name)
+                        'titulo': valor
                     }
-                    logger.info(f"📍 Sección Mayorista detectada por columna: {col_name}")
+                    logger.info(f"📍 Sección Mayorista detectada en fila {i}, columna {j}: {valor}")
                     break
+                        
+            except Exception as e:
+                continue
+    
+    # Si no se detectaron secciones, buscar por patrones más específicos
+    if not secciones:
+        logger.info("🔍 No se detectaron secciones por título, buscando por patrones...")
         
-        # Si aún no se detectaron, buscar por valores en las primeras filas
-        if not secciones:
-            logger.info("🔍 Buscando por valores en las primeras filas...")
-            
-            # Buscar filas que contengan precios con formato de moneda
-            for i in range(min(len(df), 20)):
-                for j in range(len(df.columns)):
-                    try:
-                        valor = str(df.iloc[i, j])
-                        if '$' in valor and any(c.isdigit() for c in valor):
-                            # Verificar si es una sección de precios
-                            if j < len(df.columns) // 2:  # Mitad izquierda = Minorista
-                                secciones['minorista'] = {
-                                    'fila_inicio': i,
-                                    'columna_inicio': j,
-                                    'titulo': f'Precios detectados en fila {i}'
-                                }
-                                logger.info(f"📍 Sección Minorista detectada por precios en fila {i}, columna {j}")
-                            else:  # Mitad derecha = Mayorista
-                                secciones['mayorista'] = {
-                                    'fila_inicio': i,
-                                    'columna_inicio': j,
-                                    'titulo': f'Precios detectados en fila {i}'
-                                }
-                                logger.info(f"📍 Sección Mayorista detectada por precios en fila {i}, columna {j}")
-                            break
-                    except:
-                        continue
-                if secciones:
-                    break
-    else:
-        logger.info(f"⚠️ Hoja '{hoja_nombre}' no es una de las hojas conocidas con estructura de canales")
-        logger.info(f"📋 Hojas con estructura conocida: {hojas_con_estructura}")
+        # Buscar columnas que contengan "P. Publico" o "P. Mayorista"
+        for j, col_name in enumerate(df.columns):
+            col_str = str(col_name).upper()
+            if 'P. PUBLICO' in col_str or 'PUBLICO' in col_str or 'MINORISTA' in col_str:
+                secciones['minorista'] = {
+                    'fila_inicio': 0,
+                    'columna_inicio': j,
+                    'titulo': str(col_name)
+                }
+                logger.info(f"📍 Sección Minorista detectada por columna: {col_name}")
+                break
+            elif 'P. MAYORISTA' in col_str or 'MAYORISTA' in col_str:
+                secciones['mayorista'] = {
+                    'fila_inicio': 0,
+                    'columna_inicio': j,
+                    'titulo': str(col_name)
+                }
+                logger.info(f"📍 Sección Mayorista detectada por columna: {col_name}")
+                break
+    
+    # Si aún no se detectaron, buscar por valores en las primeras filas
+    if not secciones:
+        logger.info("🔍 Buscando por valores en las primeras filas...")
+        
+        # Buscar filas que contengan precios con formato de moneda
+        for i in range(min(len(df), 20)):
+            for j in range(len(df.columns)):
+                try:
+                    valor = str(df.iloc[i, j])
+                    if '$' in valor and any(c.isdigit() for c in valor):
+                        # Verificar si es una sección de precios
+                        if j < len(df.columns) // 2:  # Mitad izquierda = Minorista
+                            secciones['minorista'] = {
+                                'fila_inicio': i,
+                                'columna_inicio': j,
+                                'titulo': f'Precios detectados en fila {i}'
+                            }
+                            logger.info(f"📍 Sección Minorista detectada por precios en fila {i}, columna {j}")
+                        else:  # Mitad derecha = Mayorista
+                            secciones['mayorista'] = {
+                                'fila_inicio': i,
+                                'columna_inicio': j,
+                                'titulo': f'Precios detectados en fila {i}'
+                            }
+                            logger.info(f"📍 Sección Mayorista detectada por precios en fila {i}, columna {j}")
+                        break
+                except:
+                    continue
+            if secciones:
+                break
     
     logger.info(f"✅ Secciones detectadas: {list(secciones.keys())}")
     return secciones
