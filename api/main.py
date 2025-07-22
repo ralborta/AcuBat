@@ -1,3 +1,4 @@
+# ULTIMO COMMIT: cf76ece - PRUEBA: Deploy automático - Verificar que Vercel funciona correctamente
 # PRUEBA DEPLOY AUTOMÁTICO - Commit de prueba para verificar que Vercel funciona
 # FORZAR REBUILD - Vercel necesita detectar cambios en main.py para incluir rentabilidad_analyzer.py
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
