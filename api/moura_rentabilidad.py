@@ -12,30 +12,30 @@ logger = logging.getLogger(__name__)
 
 def analizar_rentabilidades_moura(file_path: str) -> Dict:
     """
-    Analiza específicamente la hoja Moura del archivo de rentabilidades
+    Analiza específicamente la hoja Varta del archivo de rentabilidades
     """
     try:
-        logger.info(f"🔍 Analizando rentabilidades específicas de Moura: {file_path}")
+        logger.info(f"🔍 Analizando rentabilidades específicas de Varta: {file_path}")
         
-        # Verificar si la hoja Moura existe
+        # Verificar si la hoja Varta existe
         try:
             xl = pd.ExcelFile(file_path)
-            if "Moura" not in xl.sheet_names:
-                logger.error(f"❌ No se encontró la hoja 'Moura' en el archivo. Hojas disponibles: {xl.sheet_names}")
+            if "Varta" not in xl.sheet_names:
+                logger.error(f"❌ No se encontró la hoja 'Varta' en el archivo. Hojas disponibles: {xl.sheet_names}")
                 return {
                     'reglas_minorista': [],
                     'reglas_mayorista': [],
-                    'resumen': f"Error: No se encontró la hoja 'Moura'. Hojas disponibles: {xl.sheet_names}"
+                    'resumen': f"Error: No se encontró la hoja 'Varta'. Hojas disponibles: {xl.sheet_names}"
                 }
-            df_moura = xl.parse("Moura")
+            df_varta = xl.parse("Varta")
         except Exception as e:
-            logger.error(f"❌ Error leyendo la hoja 'Moura': {e}")
+            logger.error(f"❌ Error leyendo la hoja 'Varta': {e}")
             return {
                 'reglas_minorista': [],
                 'reglas_mayorista': [],
-                'resumen': f"Error leyendo hoja 'Moura': {str(e)}"
+                'resumen': f"Error leyendo hoja 'Varta': {str(e)}"
             }
-        logger.info(f"✅ Hoja Moura cargada: {df_moura.shape}")
+        logger.info(f"✅ Hoja Varta cargada: {df_varta.shape}")
         
         reglas_minorista = []
         reglas_mayorista = []
@@ -52,71 +52,71 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
         logger.info(f"🔍 Buscando columnas MARK-UP y RENT dinámicamente en fila {fila_headers + 1}:")
         
         # Buscar columnas por contenido
-        for j in range(len(df_moura.columns)):
+        for j in range(len(df_varta.columns)):
             try:
-                valor = str(df_moura.iloc[fila_headers, j]).strip().upper()
+                valor = str(df_varta.iloc[fila_headers, j]).strip().upper()
                 logger.info(f"  Columna {j}: '{valor}'")
                 
-                # Buscar MARK-UP (Minorista)
+                # Buscar MARK-UP (Minorista) - Columna Y
                 if 'MARK' in valor and 'UP' in valor and col_markup_minorista is None:
                     col_markup_minorista = j
                     logger.info(f"    ✅ MARK-UP Minorista encontrado en columna {j}")
                 
-                # Buscar RENT (Minorista)
-                elif 'RENT' in valor and col_rent_minorista is None and col_markup_minorista is not None:
+                # Buscar RENTABILIDAD (Minorista) - Columna Z
+                elif 'RENTABILIDAD' in valor and col_rent_minorista is None:
                     col_rent_minorista = j
-                    logger.info(f"    ✅ RENT Minorista encontrado en columna {j}")
+                    logger.info(f"    ✅ RENTABILIDAD Minorista encontrado en columna {j}")
                 
-                # Buscar segundo MARK-UP (Mayorista)
-                elif 'MARK' in valor and 'UP' in valor and col_markup_minorista is not None and col_markup_mayorista is None:
+                # Buscar Mak-up (Mayorista) - Columna Q
+                elif 'MAK' in valor and 'UP' in valor and col_markup_mayorista is None:
                     col_markup_mayorista = j
-                    logger.info(f"    ✅ MARK-UP Mayorista encontrado en columna {j}")
+                    logger.info(f"    ✅ Mak-up Mayorista encontrado en columna {j}")
                 
-                # Buscar RENTABILIDAD (Mayorista)
-                elif 'RENTABILIDAD' in valor and col_rent_mayorista is None:
+                # Buscar rentabili (Mayorista) - Columna R
+                elif 'RENTABILI' in valor and col_rent_mayorista is None:
                     col_rent_mayorista = j
-                    logger.info(f"    ✅ RENTABILIDAD Mayorista encontrado en columna {j}")
+                    logger.info(f"    ✅ rentabili Mayorista encontrado en columna {j}")
                     
             except Exception as e:
                 logger.warning(f"    ⚠️ Error procesando columna {j}: {e}")
                 continue
         
-        # Si no se encontraron, usar las posiciones originales como fallback
-        if col_markup_minorista is None and 16 < len(df_moura.columns):
-            col_markup_minorista = 16
+        # Si no se encontraron, usar las posiciones correctas como fallback
+        if col_markup_minorista is None and 24 < len(df_varta.columns):  # Columna Y
+            col_markup_minorista = 24
             logger.info(f"    ⚠️ Usando posición fallback para MARK-UP Minorista: {col_markup_minorista}")
         
-        if col_rent_minorista is None and 17 < len(df_moura.columns):
-            col_rent_minorista = 17
-            logger.info(f"    ⚠️ Usando posición fallback para RENT Minorista: {col_rent_minorista}")
+        if col_rent_minorista is None and 25 < len(df_varta.columns):  # Columna Z
+            col_rent_minorista = 25
+            logger.info(f"    ⚠️ Usando posición fallback para RENTABILIDAD Minorista: {col_rent_minorista}")
         
-        if col_markup_mayorista is None and 25 < len(df_moura.columns):
-            col_markup_mayorista = 25
-            logger.info(f"    ⚠️ Usando posición fallback para MARK-UP Mayorista: {col_markup_mayorista}")
+        if col_markup_mayorista is None and 15 < len(df_varta.columns):  # Columna Q
+            col_markup_mayorista = 15
+            logger.info(f"    ⚠️ Usando posición fallback para Mak-up Mayorista: {col_markup_mayorista}")
         
-        if col_rent_mayorista is None and 26 < len(df_moura.columns):
-            col_rent_mayorista = 26
-            logger.info(f"    ⚠️ Usando posición fallback para RENTABILIDAD Mayorista: {col_rent_mayorista}")
+        if col_rent_mayorista is None and 16 < len(df_varta.columns):  # Columna R
+            col_rent_mayorista = 16
+            logger.info(f"    ⚠️ Usando posición fallback para rentabili Mayorista: {col_rent_mayorista}")
         
         logger.info(f"📊 Columnas finales detectadas:")
-        logger.info(f"  MARK-UP Minorista: {col_markup_minorista} - Valor: {df_moura.iloc[fila_headers, col_markup_minorista] if col_markup_minorista is not None else 'NO ENCONTRADO'}")
-        logger.info(f"  RENT Minorista: {col_rent_minorista} - Valor: {df_moura.iloc[fila_headers, col_rent_minorista] if col_rent_minorista is not None else 'NO ENCONTRADO'}")
-        logger.info(f"  MARK-UP Mayorista: {col_markup_mayorista} - Valor: {df_moura.iloc[fila_headers, col_markup_mayorista] if col_markup_mayorista is not None else 'NO ENCONTRADO'}")
-        logger.info(f"  RENTABILIDAD Mayorista: {col_rent_mayorista} - Valor: {df_moura.iloc[fila_headers, col_rent_mayorista] if col_rent_mayorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  MARK-UP Minorista: {col_markup_minorista} - Valor: {df_varta.iloc[fila_headers, col_markup_minorista] if col_markup_minorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  RENT Minorista: {col_rent_minorista} - Valor: {df_varta.iloc[fila_headers, col_rent_minorista] if col_rent_minorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  MARK-UP Mayorista: {col_markup_mayorista} - Valor: {df_varta.iloc[fila_headers, col_markup_mayorista] if col_markup_mayorista is not None else 'NO ENCONTRADO'}")
+        logger.info(f"  RENTABILIDAD Mayorista: {col_rent_mayorista} - Valor: {df_varta.iloc[fila_headers, col_rent_mayorista] if col_rent_mayorista is not None else 'NO ENCONTRADO'}")
         
         # Procesar productos desde la línea 3 (fila 2) en adelante
-        for i in range(fila_headers + 1, len(df_moura)):
+        for i in range(fila_headers + 1, len(df_varta)):
             try:
-                codigo = str(df_moura.iloc[i, 0]).strip()
+                codigo = str(df_varta.iloc[i, 0]).strip()
                 if not codigo or codigo == 'nan':
                     continue
-                precio_base = _convertir_precio(df_moura.iloc[i, 1])
+                precio_base = _convertir_precio(df_varta.iloc[i, 1])
                 if not precio_base:
                     continue
                 # Extraer datos Minorista
-                if col_markup_minorista < len(df_moura.columns) and col_rent_minorista < len(df_moura.columns):
-                    markup_minorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_minorista])
-                    rent_minorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_minorista])
+                if col_markup_minorista < len(df_varta.columns) and col_rent_minorista < len(df_varta.columns):
+                    markup_minorista = _convertir_porcentaje(df_varta.iloc[i, col_markup_minorista])
+                    rent_minorista = _convertir_porcentaje(df_varta.iloc[i, col_rent_minorista])
                     if markup_minorista > 0:
                         regla_minorista = {
                             'codigo': codigo,
@@ -125,14 +125,14 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
                             'markup': markup_minorista,
                             'rentabilidad': rent_minorista,
                             'fila': i,
-                            'hoja': 'Moura'
+                            'hoja': 'Varta'
                         }
                         reglas_minorista.append(regla_minorista)
                         logger.info(f"✅ Regla Minorista: {codigo} - Markup: {markup_minorista}%")
                 # Extraer datos Mayorista
-                if col_markup_mayorista < len(df_moura.columns) and col_rent_mayorista < len(df_moura.columns):
-                    markup_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_mayorista])
-                    rent_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_mayorista])
+                if col_markup_mayorista < len(df_varta.columns) and col_rent_mayorista < len(df_varta.columns):
+                    markup_mayorista = _convertir_porcentaje(df_varta.iloc[i, col_markup_mayorista])
+                    rent_mayorista = _convertir_porcentaje(df_varta.iloc[i, col_rent_mayorista])
                     if markup_mayorista > 0:
                         regla_mayorista = {
                             'codigo': codigo,
@@ -141,7 +141,7 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
                             'markup': markup_mayorista,
                             'rentabilidad': rent_mayorista,
                             'fila': i,
-                            'hoja': 'Moura'
+                            'hoja': 'Varta'
                         }
                         reglas_mayorista.append(regla_mayorista)
                         logger.info(f"✅ Regla Mayorista: {codigo} - Markup: {markup_mayorista}%")
@@ -152,7 +152,7 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
             'total_reglas': len(reglas_minorista) + len(reglas_mayorista),
             'reglas_minorista': len(reglas_minorista),
             'reglas_mayorista': len(reglas_mayorista),
-            'hoja': 'Moura',
+            'hoja': 'Varta',
             'estado': '✅ Procesado correctamente' if (reglas_minorista or reglas_mayorista) else '❌ Sin reglas encontradas'
         }
         logger.info(f"🎉 Análisis completado: {resumen['total_reglas']} reglas encontradas")
