@@ -1,114 +1,77 @@
 #!/usr/bin/env python3
-"""
-Script para diagnosticar qué columnas está detectando el sistema
-en el archivo Rentalibilidades-2.xlsx
-"""
-
 import pandas as pd
-import logging
-
-# Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-logger = logging.getLogger(__name__)
+import numpy as np
 
 def diagnosticar_columnas():
-    """Diagnostica las columnas del archivo de rentabilidades"""
+    print("🔍 DIAGNÓSTICO DE COLUMNAS - Rentalibilidades-2.xlsx")
+    print("=" * 60)
     
-    archivo = "Rentalibilidades-2.xlsx"
+    # Leer el archivo
+    df = pd.read_excel('Rentalibilidades-2.xlsx', sheet_name='Moura')
     
-    try:
-        # Leer el archivo
-        logger.info(f"📁 Leyendo archivo: {archivo}")
-        df = pd.read_excel(archivo, sheet_name=None)
-        
-        # Mostrar hojas disponibles
-        logger.info(f"📋 Hojas disponibles: {list(df.keys())}")
-        
-        # Analizar cada hoja
-        for hoja_nombre, df_hoja in df.items():
-            logger.info(f"\n🔍 ANALIZANDO HOJA: {hoja_nombre}")
-            logger.info(f"📏 Dimensiones: {df_hoja.shape}")
-            
-            # Mostrar las primeras 10 filas y 30 columnas
-            logger.info(f"📊 Primeras 10 filas, primeras 30 columnas:")
-            
-            for i in range(min(10, len(df_hoja))):
-                fila_info = f"Fila {i}: "
-                for j in range(min(30, len(df_hoja.columns))):
-                    valor = str(df_hoja.iloc[i, j]).strip()
-                    if valor and valor != 'nan':
-                        fila_info += f"[{j}]:'{valor}' "
-                if fila_info != f"Fila {i}: ":
-                    logger.info(fila_info)
-            
-            # Buscar específicamente las columnas P y Y en la línea 5 (fila 4)
-            if len(df_hoja) > 4:
-                logger.info(f"\n🎯 BUSCANDO COLUMNAS P y Y EN LÍNEA 5 (fila 4):")
-                fila_5 = df_hoja.iloc[4]  # Línea 5
-                
-                columna_p = None
-                columna_y = None
-                
-                for j, valor in enumerate(fila_5):
-                    valor_str = str(valor).strip().upper()
-                    logger.info(f"  Columna {j}: '{valor_str}'")
-                    
-                    if valor_str == 'P' or 'P.' in valor_str:
-                        columna_p = j
-                        logger.info(f"  ✅ COLUMNA P ENCONTRADA en posición {j}")
-                    
-                    if valor_str == 'Y' or 'Y.' in valor_str:
-                        columna_y = j
-                        logger.info(f"  ✅ COLUMNA Y ENCONTRADA en posición {j}")
-                
-                if columna_p is not None:
-                    logger.info(f"🎯 COLUMNA P (Minorista): Posición {columna_p}")
-                else:
-                    logger.info(f"❌ NO SE ENCONTRÓ COLUMNA P")
-                
-                if columna_y is not None:
-                    logger.info(f"🎯 COLUMNA Y (Mayorista): Posición {columna_y}")
-                else:
-                    logger.info(f"❌ NO SE ENCONTRÓ COLUMNA Y")
-                
-                # Mostrar datos de las columnas P y Y si se encontraron
-                if columna_p is not None or columna_y is not None:
-                    logger.info(f"\n📊 DATOS DE LAS COLUMNAS DETECTADAS:")
-                    
-                    for i in range(5, min(15, len(df_hoja))):  # Desde línea 6
-                        fila_data = f"Línea {i+1}: "
-                        
-                        if columna_p is not None:
-                            valor_p = df_hoja.iloc[i, columna_p]
-                            fila_data += f"P[{columna_p}]='{valor_p}' "
-                        
-                        if columna_y is not None:
-                            valor_y = df_hoja.iloc[i, columna_y]
-                            fila_data += f"Y[{columna_y}]='{valor_y}' "
-                        
-                        logger.info(fila_data)
-            
-            # Buscar patrones de texto que el sistema actual está buscando
-            logger.info(f"\n🔍 BUSCANDO PATRONES QUE EL SISTEMA DETECTA:")
-            
-            for i in range(min(10, len(df_hoja))):
-                for j in range(min(30, len(df_hoja.columns))):
-                    try:
-                        valor = str(df_hoja.iloc[i, j]).strip().upper()
-                        
-                        if 'P. PUBLICO' in valor or 'PUBLICO' in valor or 'MINORISTA' in valor:
-                            logger.info(f"  ✅ PATRÓN MINORISTA: Fila {i}, Col {j}: '{valor}'")
-                        
-                        if 'P. MAYORISTA' in valor or 'MAYORISTA' in valor:
-                            logger.info(f"  ✅ PATRÓN MAYORISTA: Fila {i}, Col {j}: '{valor}'")
-                            
-                    except:
-                        continue
-            
-            logger.info(f"\n{'='*50}")
+    print(f"📊 Forma del DataFrame: {df.shape}")
+    print(f"📋 Columnas: {df.columns.tolist()}")
+    print()
     
-    except Exception as e:
-        logger.error(f"❌ Error: {e}")
+    # Mostrar fila 2 (headers)
+    print("📋 FILA 2 (Headers):")
+    for i, valor in enumerate(df.iloc[1]):
+        print(f"  Columna {i}: {valor}")
+    print()
+    
+    # Buscar columnas con MARK-UP y RENT
+    print("🔍 BUSCANDO COLUMNAS MARK-UP Y RENT:")
+    col_markup_minorista = None
+    col_rent_minorista = None
+    col_markup_mayorista = None
+    col_rent_mayorista = None
+    
+    for j in range(len(df.columns)):
+        try:
+            valor = str(df.iloc[1, j]).strip().upper()
+            if 'MARK' in valor and 'UP' in valor:
+                if col_markup_minorista is None:
+                    col_markup_minorista = j
+                    print(f"  ✅ MARK-UP Minorista: Columna {j} = '{df.iloc[1, j]}'")
+                elif col_markup_mayorista is None:
+                    col_markup_mayorista = j
+                    print(f"  ✅ MARK-UP Mayorista: Columna {j} = '{df.iloc[1, j]}'")
+            elif 'RENT' in valor and 'RENTABILIDAD' not in valor:
+                if col_rent_minorista is None:
+                    col_rent_minorista = j
+                    print(f"  ✅ RENT Minorista: Columna {j} = '{df.iloc[1, j]}'")
+            elif 'RENTABILIDAD' in valor:
+                if col_rent_mayorista is None:
+                    col_rent_mayorista = j
+                    print(f"  ✅ RENTABILIDAD Mayorista: Columna {j} = '{df.iloc[1, j]}'")
+        except:
+            continue
+    
+    print()
+    print("📊 PRIMEROS 5 PRODUCTOS CON SUS MARKUPS:")
+    print("Código | Precio Base | Markup Minorista | Rent Minorista | Markup Mayorista | Rent Mayorista")
+    print("-" * 100)
+    
+    for i in range(2, min(7, len(df))):
+        try:
+            codigo = str(df.iloc[i, 0]).strip()
+            precio_base = df.iloc[i, 1]
+            
+            markup_minorista = df.iloc[i, col_markup_minorista] if col_markup_minorista is not None else "N/A"
+            rent_minorista = df.iloc[i, col_rent_minorista] if col_rent_minorista is not None else "N/A"
+            markup_mayorista = df.iloc[i, col_markup_mayorista] if col_markup_mayorista is not None else "N/A"
+            rent_mayorista = df.iloc[i, col_rent_mayorista] if col_rent_mayorista is not None else "N/A"
+            
+            print(f"{codigo:8} | {precio_base:10} | {markup_minorista:16} | {rent_minorista:13} | {markup_mayorista:16} | {rent_mayorista:13}")
+        except Exception as e:
+            print(f"Error en fila {i}: {e}")
+    
+    print()
+    print("🎯 POSICIONES FINALES DETECTADAS:")
+    print(f"  MARK-UP Minorista: Columna {col_markup_minorista}")
+    print(f"  RENT Minorista: Columna {col_rent_minorista}")
+    print(f"  MARK-UP Mayorista: Columna {col_markup_mayorista}")
+    print(f"  RENTABILIDAD Mayorista: Columna {col_rent_mayorista}")
 
 if __name__ == "__main__":
     diagnosticar_columnas() 
