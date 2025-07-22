@@ -1,3 +1,4 @@
+# FORZAR DEPLOY: Importaciones absolutas para Vercel - Commit ed5b97a
 # FORZAR DEPLOY: Cambio de rewrites a routes en vercel.json - Commit 7dbe87f
 # FORZAR DEPLOY FINAL: JSON simplificado - Commit 6728e77 - Vercel debe reconocer este código
 # ULTIMO COMMIT: cf76ece - PRUEBA: Deploy automático - Verificar que Vercel funciona correctamente
@@ -43,13 +44,13 @@ rentabilidades_filename = None
 precios_data = None
 precios_filename = None
 
-# Importar módulos de forma segura
+# Importar módulos de forma segura con importaciones absolutas
 try:
-    from .logic import PricingLogic
-    from .openai_helper import OpenAIHelper
-    from .parser import ExcelParser, detect_and_parse_file, is_moura_file
-    from .models import Producto, Marca, Canal
-    from .rentabilidad_analyzer import RentabilidadAnalyzer, analizar_rentabilidades_2_canales
+    from api.logic import PricingLogic
+    from api.openai_helper import OpenAIHelper
+    from api.parser import ExcelParser, detect_and_parse_file, is_moura_file
+    from api.models import Producto, Marca, Canal
+    from api.rentabilidad_analyzer import RentabilidadAnalyzer, analizar_rentabilidades_2_canales
     
     pricing_logic = PricingLogic()
     openai_helper = OpenAIHelper()
