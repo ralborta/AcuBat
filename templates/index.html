@@ -881,6 +881,7 @@
 
         function subirPrecios(file) {
             console.log('📤 Subiendo archivo de precios:', file.name);
+            console.log('🔍 Estado ANTES de subir - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
             mostrarCarga('Subiendo archivo de precios...');
             
             const formData = new FormData();
@@ -896,14 +897,19 @@
             })
             .then(data => {
                 console.log('📊 Resultado de subida de precios:', data);
+                console.log('🔍 Status recibido:', data.status);
+                console.log('🔍 Mensaje recibido:', data.mensaje);
                 ocultarCarga();
                 if (data.status === 'success') {
+                    console.log('✅ Status es success, actualizando variables...');
                     preciosCargados = true;
+                    console.log('🔍 Estado DESPUÉS de actualizar - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
                     mostrarAlerta('success', `✅ ${data.mensaje}`, 'preciosStatus');
                     actualizarEstadisticas();
                     actualizarPasos();
                     actualizarEstadoArchivos();
                 } else {
+                    console.log('❌ Status NO es success:', data.status);
                     mostrarAlerta('danger', `❌ ${data.mensaje}`, 'preciosStatus');
                 }
             })
@@ -916,6 +922,7 @@
 
         function subirRentabilidades(file) {
             console.log('📤 Subiendo archivo de rentabilidades:', file.name);
+            console.log('🔍 Estado ANTES de subir - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
             mostrarCarga('Subiendo archivo de rentabilidades...');
             
             const formData = new FormData();
@@ -931,14 +938,19 @@
             })
             .then(data => {
                 console.log('📊 Resultado de subida de rentabilidades:', data);
+                console.log('🔍 Status recibido:', data.status);
+                console.log('🔍 Mensaje recibido:', data.mensaje);
                 ocultarCarga();
                 if (data.status === 'success') {
+                    console.log('✅ Status es success, actualizando variables...');
                     rentabilidadesCargadas = true;
+                    console.log('🔍 Estado DESPUÉS de actualizar - precios:', preciosCargados, 'rentabilidades:', rentabilidadesCargadas);
                     mostrarAlerta('success', `✅ ${data.mensaje}`, 'rentabilidadesStatus');
                     actualizarEstadisticas();
                     actualizarPasos();
                     actualizarEstadoArchivos();
                 } else {
+                    console.log('❌ Status NO es success:', data.status);
                     mostrarAlerta('danger', `❌ ${data.mensaje}`, 'rentabilidadesStatus');
                 }
             })
