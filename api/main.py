@@ -1,3 +1,4 @@
+# FORZAR DEPLOY: Cambio de rewrites a routes en vercel.json - Commit 7dbe87f
 # FORZAR DEPLOY FINAL: JSON simplificado - Commit 6728e77 - Vercel debe reconocer este código
 # ULTIMO COMMIT: cf76ece - PRUEBA: Deploy automático - Verificar que Vercel funciona correctamente
 # PRUEBA DEPLOY AUTOMÁTICO - Commit de prueba para verificar que Vercel funciona
