@@ -1078,8 +1078,8 @@
             tablaHTML += '<th>Código</th>';
             tablaHTML += '<th>Nombre</th>';
             tablaHTML += '<th>Precio Base</th>';
-            tablaHTML += '<th colspan="3" class="text-center text-success">Canal Minorista</th>';
-            tablaHTML += '<th colspan="3" class="text-center text-warning">Canal Mayorista</th>';
+            tablaHTML += '<th colspan="4" class="text-center text-success">Canal Minorista</th>';
+            tablaHTML += '<th colspan="4" class="text-center text-warning">Canal Mayorista</th>';
             tablaHTML += '</tr>';
             tablaHTML += '<tr>';
             tablaHTML += '<th></th>';
@@ -1087,9 +1087,11 @@
             tablaHTML += '<th></th>';
             tablaHTML += '<th class="text-success">Precio Final</th>';
             tablaHTML += '<th class="text-success">Markup</th>';
+            tablaHTML += '<th class="text-success">Rentabilidad</th>';
             tablaHTML += '<th class="text-success">Estado</th>';
             tablaHTML += '<th class="text-warning">Precio Final</th>';
             tablaHTML += '<th class="text-warning">Markup</th>';
+            tablaHTML += '<th class="text-warning">Rentabilidad</th>';
             tablaHTML += '<th class="text-warning">Estado</th>';
             tablaHTML += '</tr>';
             tablaHTML += '</thead>';
@@ -1120,11 +1122,13 @@
                 // Datos Minorista
                 tablaHTML += `<td class="text-success">$${minorista.precio_final ? minorista.precio_final.toLocaleString() : 'N/A'}</td>`;
                 tablaHTML += `<td class="text-success">${minorista.markup_aplicado ? minorista.markup_aplicado.toFixed(1) + '%' : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-success">${minorista.rentabilidad ? minorista.rentabilidad.toFixed(1) + '%' : 'N/A'}</td>`;
                 tablaHTML += `<td class="${estadoMinoristaClass}"><strong>${minorista.estado || 'N/A'}</strong></td>`;
                 
                 // Datos Mayorista
                 tablaHTML += `<td class="text-warning">$${mayorista.precio_final ? mayorista.precio_final.toLocaleString() : 'N/A'}</td>`;
                 tablaHTML += `<td class="text-warning">${mayorista.markup_aplicado ? mayorista.markup_aplicado.toFixed(1) + '%' : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-warning">${mayorista.rentabilidad ? mayorista.rentabilidad.toFixed(1) + '%' : 'N/A'}</td>`;
                 tablaHTML += `<td class="${estadoMayoristaClass}"><strong>${mayorista.estado || 'N/A'}</strong></td>`;
                 
                 tablaHTML += '</tr>';

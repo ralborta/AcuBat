@@ -1122,7 +1122,16 @@ async def calcular_precios_con_rentabilidad():
                         logger.info(f"✅ Regla Minorista encontrada para {codigo}: {regla['markup']}%")
                         break
                 
-                # Si no se encuentra regla específica, usar la primera disponible
+                # Si no se encuentra regla específica, buscar por similitud de código
+                if not regla_minorista and analisis_rentabilidades['reglas_minorista']:
+                    # Buscar regla con código similar (mismo prefijo)
+                    for regla in analisis_rentabilidades['reglas_minorista']:
+                        if codigo.startswith(regla['codigo'][:3]) or regla['codigo'].startswith(codigo[:3]):
+                            regla_minorista = regla
+                            logger.info(f"⚠️ Usando regla Minorista similar para {codigo}: {regla['markup']}% (código: {regla['codigo']})")
+                            break
+                
+                # Si aún no se encuentra, usar la primera disponible
                 if not regla_minorista and analisis_rentabilidades['reglas_minorista']:
                     regla_minorista = analisis_rentabilidades['reglas_minorista'][0]
                     logger.info(f"⚠️ Usando regla Minorista default para {codigo}: {regla_minorista['markup']}%")
@@ -1134,7 +1143,16 @@ async def calcular_precios_con_rentabilidad():
                         logger.info(f"✅ Regla Mayorista encontrada para {codigo}: {regla['markup']}%")
                         break
                 
-                # Si no se encuentra regla específica, usar la primera disponible
+                # Si no se encuentra regla específica, buscar por similitud de código
+                if not regla_mayorista and analisis_rentabilidades['reglas_mayorista']:
+                    # Buscar regla con código similar (mismo prefijo)
+                    for regla in analisis_rentabilidades['reglas_mayorista']:
+                        if codigo.startswith(regla['codigo'][:3]) or regla['codigo'].startswith(codigo[:3]):
+                            regla_mayorista = regla
+                            logger.info(f"⚠️ Usando regla Mayorista similar para {codigo}: {regla['markup']}% (código: {regla['codigo']})")
+                            break
+                
+                # Si aún no se encuentra, usar la primera disponible
                 if not regla_mayorista and analisis_rentabilidades['reglas_mayorista']:
                     regla_mayorista = analisis_rentabilidades['reglas_mayorista'][0]
                     logger.info(f"⚠️ Usando regla Mayorista default para {codigo}: {regla_mayorista['markup']}%")
@@ -1159,6 +1177,7 @@ async def calcular_precios_con_rentabilidad():
                         'precio_final': precio_minorista,
                         'markup_aplicado': markup_minorista,
                         'margen': margen_minorista,
+                        'rentabilidad': regla_minorista.get('rentabilidad', 0),
                         'estado': 'ÓPTIMO' if margen_minorista >= 20 else 'ADVERTENCIA' if margen_minorista >= 10 else 'CRÍTICO'
                     }
                 else:
@@ -1176,6 +1195,7 @@ async def calcular_precios_con_rentabilidad():
                         'precio_final': precio_mayorista,
                         'markup_aplicado': markup_mayorista,
                         'margen': margen_mayorista,
+                        'rentabilidad': regla_mayorista.get('rentabilidad', 0),
                         'estado': 'ÓPTIMO' if margen_mayorista >= 20 else 'ADVERTENCIA' if margen_mayorista >= 10 else 'CRÍTICO'
                     }
                 else:
