@@ -17,8 +17,24 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
     try:
         logger.info(f"🔍 Analizando rentabilidades específicas de Moura: {file_path}")
         
-        # Leer la hoja Moura específicamente
-        df_moura = pd.read_excel(file_path, sheet_name="Moura")
+        # Verificar si la hoja Moura existe
+        try:
+            xl = pd.ExcelFile(file_path)
+            if "Moura" not in xl.sheet_names:
+                logger.error(f"❌ No se encontró la hoja 'Moura' en el archivo. Hojas disponibles: {xl.sheet_names}")
+                return {
+                    'reglas_minorista': [],
+                    'reglas_mayorista': [],
+                    'resumen': f"Error: No se encontró la hoja 'Moura'. Hojas disponibles: {xl.sheet_names}"
+                }
+            df_moura = xl.parse("Moura")
+        except Exception as e:
+            logger.error(f"❌ Error leyendo la hoja 'Moura': {e}")
+            return {
+                'reglas_minorista': [],
+                'reglas_mayorista': [],
+                'resumen': f"Error leyendo hoja 'Moura': {str(e)}"
+            }
         logger.info(f"✅ Hoja Moura cargada: {df_moura.shape}")
         
         reglas_minorista = []
@@ -31,18 +47,23 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
         # - Columna 25: MARK-UP (Mayorista)
         # - Columna 26: RENTABILIDAD (Rentabilidad Mayorista)
         
-        # Buscar la línea con los headers (línea 2, fila 1)
         fila_headers = 1  # Línea 2
         
         if len(df_moura) <= fila_headers:
             logger.error("❌ No hay suficientes filas en la hoja Moura")
+            logger.info(f"Primeras filas encontradas: {df_moura.head(5).to_dict()}")
             return {
                 'reglas_minorista': [],
                 'reglas_mayorista': [],
-                'resumen': 'Error: Estructura insuficiente'
+                'resumen': f"Error: Estructura insuficiente. Filas encontradas: {df_moura.head(5).to_dict()}"
             }
         
-        # Verificar que las columnas esperadas existen
+        # Mostrar las primeras 3 filas y todas las columnas para diagnóstico
+        logger.info(f"Primeras 3 filas de Moura:")
+        for i in range(min(3, len(df_moura))):
+            logger.info(f"Fila {i}: {[str(df_moura.iloc[i, j]) for j in range(len(df_moura.columns))]}")
+        logger.info(f"Columnas detectadas: {list(df_moura.columns)}")
+        
         col_markup_minorista = 16  # MARK-UP Minorista
         col_rent_minorista = 17    # RENT Minorista
         col_markup_mayorista = 25  # MARK-UP Mayorista
@@ -57,21 +78,16 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
         # Procesar productos desde la línea 3 (fila 2) en adelante
         for i in range(fila_headers + 1, len(df_moura)):
             try:
-                # Obtener código del producto (columna 0)
                 codigo = str(df_moura.iloc[i, 0]).strip()
                 if not codigo or codigo == 'nan':
                     continue
-                
-                # Obtener precios base (columna 1)
                 precio_base = _convertir_precio(df_moura.iloc[i, 1])
                 if not precio_base:
                     continue
-                
                 # Extraer datos Minorista
                 if col_markup_minorista < len(df_moura.columns) and col_rent_minorista < len(df_moura.columns):
                     markup_minorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_minorista])
                     rent_minorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_minorista])
-                    
                     if markup_minorista > 0:
                         regla_minorista = {
                             'codigo': codigo,
@@ -84,12 +100,10 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
                         }
                         reglas_minorista.append(regla_minorista)
                         logger.info(f"✅ Regla Minorista: {codigo} - Markup: {markup_minorista}%")
-                
                 # Extraer datos Mayorista
                 if col_markup_mayorista < len(df_moura.columns) and col_rent_mayorista < len(df_moura.columns):
                     markup_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_mayorista])
                     rent_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_mayorista])
-                    
                     if markup_mayorista > 0:
                         regla_mayorista = {
                             'codigo': codigo,
@@ -102,27 +116,22 @@ def analizar_rentabilidades_moura(file_path: str) -> Dict:
                         }
                         reglas_mayorista.append(regla_mayorista)
                         logger.info(f"✅ Regla Mayorista: {codigo} - Markup: {markup_mayorista}%")
-                
             except Exception as e:
                 logger.warning(f"⚠️ Error procesando fila {i}: {e}")
                 continue
-        
         resumen = {
             'total_reglas': len(reglas_minorista) + len(reglas_mayorista),
             'reglas_minorista': len(reglas_minorista),
             'reglas_mayorista': len(reglas_mayorista),
             'hoja': 'Moura',
-            'estado': '✅ Procesado correctamente'
+            'estado': '✅ Procesado correctamente' if (reglas_minorista or reglas_mayorista) else '❌ Sin reglas encontradas'
         }
-        
         logger.info(f"🎉 Análisis completado: {resumen['total_reglas']} reglas encontradas")
-        
         return {
             'reglas_minorista': reglas_minorista,
             'reglas_mayorista': reglas_mayorista,
             'resumen': resumen
         }
-        
     except Exception as e:
         logger.error(f"❌ Error analizando rentabilidades Moura: {e}")
         return {
