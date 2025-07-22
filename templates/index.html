@@ -1052,17 +1052,17 @@
             // Canal Minorista
             resumenHTML += '<div class="col-md-4">';
             resumenHTML += '<div class="text-center">';
-            resumenHTML += `<h4 class="text-success">${data.resumen.canal_minorista.productos}</h4>`;
+            resumenHTML += `<h4 class="text-success">${data.resumen.total_minorista}</h4>`;
             resumenHTML += '<p class="text-muted">Canal Minorista</p>';
-            resumenHTML += `<small class="text-info">Margen Promedio: ${data.resumen.canal_minorista.margen_promedio.toFixed(1)}%</small>`;
+            resumenHTML += `<small class="text-info">Margen Promedio: ${data.resumen.margen_promedio_minorista.toFixed(1)}%</small>`;
             resumenHTML += '</div></div>';
             
             // Canal Mayorista
             resumenHTML += '<div class="col-md-4">';
             resumenHTML += '<div class="text-center">';
-            resumenHTML += `<h4 class="text-warning">${data.resumen.canal_mayorista.productos}</h4>`;
+            resumenHTML += `<h4 class="text-warning">${data.resumen.total_mayorista}</h4>`;
             resumenHTML += '<p class="text-muted">Canal Mayorista</p>';
-            resumenHTML += `<small class="text-info">Margen Promedio: ${data.resumen.canal_mayorista.margen_promedio.toFixed(1)}%</small>`;
+            resumenHTML += `<small class="text-info">Margen Promedio: ${data.resumen.margen_promedio_mayorista.toFixed(1)}%</small>`;
             resumenHTML += '</div></div>';
             
             resumenHTML += '</div></div></div>';
@@ -1138,13 +1138,13 @@
             tablaHTML += '<div class="col-md-6">';
             tablaHTML += '<div class="alert alert-success">';
             tablaHTML += '<strong>Canal Minorista:</strong> ';
-            tablaHTML += `${data.resumen.reglas_detectadas.minorista} reglas detectadas, `;
+            tablaHTML += `${data.resumen.reglas_cargadas} reglas cargadas, `;
             tablaHTML += `markup variable por producto`;
             tablaHTML += '</div></div>';
             tablaHTML += '<div class="col-md-6">';
             tablaHTML += '<div class="alert alert-warning">';
             tablaHTML += '<strong>Canal Mayorista:</strong> ';
-            tablaHTML += `${data.resumen.reglas_detectadas.mayorista} reglas detectadas, `;
+            tablaHTML += `${data.resumen.reglas_cargadas} reglas cargadas, `;
             tablaHTML += `markup variable por producto`;
             tablaHTML += '</div></div>';
             tablaHTML += '</div></div>';
