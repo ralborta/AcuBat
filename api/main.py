@@ -15,6 +15,9 @@ import json
 from dotenv import load_dotenv
 import pandas as pd
 import traceback
+import io
+from datetime import datetime
+from fastapi.responses import StreamingResponse
 
 # Cargar variables de entorno
 load_dotenv()
@@ -1394,3 +1397,102 @@ async def listar_archivos():
             "error": str(e),
             "directorio_actual": os.getcwd() if os.getcwd() else "No disponible"
         }
+
+@app.post("/descargar-excel")
+async def descargar_excel(data: dict):
+    """
+    Genera y descarga un archivo Excel con los resultados de precios
+    """
+    try:
+        logger.info("📊 Generando archivo Excel...")
+        
+        # Crear un DataFrame con los resultados
+        productos = []
+        
+        for producto in data.get('productos', []):
+            codigo = producto.get('codigo', '')
+            descripcion = producto.get('descripcion', '')
+            precio_base = producto.get('precio_base', 0)
+            
+            # Datos Minorista
+            minorista = producto.get('canales', {}).get('minorista', {})
+            precio_minorista = minorista.get('precio_final', 0)
+            markup_minorista = minorista.get('markup_aplicado', 0)
+            rentabilidad_minorista = minorista.get('rentabilidad', 0)
+            estado_minorista = minorista.get('estado', '')
+            
+            # Datos Mayorista
+            mayorista = producto.get('canales', {}).get('mayorista', {})
+            precio_mayorista = mayorista.get('precio_final', 0)
+            markup_mayorista = mayorista.get('markup_aplicado', 0)
+            rentabilidad_mayorista = mayorista.get('rentabilidad', 0)
+            estado_mayorista = mayorista.get('estado', '')
+            
+            productos.append({
+                'Código': codigo,
+                'Descripción': descripcion,
+                'Precio Base': precio_base,
+                'Precio Minorista': precio_minorista,
+                'Markup Minorista (%)': markup_minorista,
+                'Rentabilidad Minorista (%)': rentabilidad_minorista,
+                'Estado Minorista': estado_minorista,
+                'Precio Mayorista': precio_mayorista,
+                'Markup Mayorista (%)': markup_mayorista,
+                'Rentabilidad Mayorista (%)': rentabilidad_mayorista,
+                'Estado Mayorista': estado_mayorista
+            })
+        
+        # Crear DataFrame
+        df = pd.DataFrame(productos)
+        
+        # Crear archivo Excel en memoria
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Precios Calculados', index=False)
+            
+            # Obtener el workbook para formatear
+            workbook = writer.book
+            worksheet = writer.sheets['Precios Calculados']
+            
+            # Formatear columnas de precios
+            for col in ['C', 'D', 'H']:  # Precio Base, Precio Minorista, Precio Mayorista
+                for row in range(2, len(productos) + 2):
+                    cell = worksheet[f'{col}{row}']
+                    cell.number_format = '$#,##0'
+            
+            # Formatear columnas de porcentajes
+            for col in ['E', 'F', 'I', 'J']:  # Markups y Rentabilidades
+                for row in range(2, len(productos) + 2):
+                    cell = worksheet[f'{col}{row}']
+                    cell.number_format = '0.00%'
+            
+            # Ajustar ancho de columnas
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        output.seek(0)
+        
+        # Generar nombre de archivo con timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"precios_calculados_{timestamp}.xlsx"
+        
+        logger.info(f"✅ Archivo Excel generado: {filename}")
+        
+        return StreamingResponse(
+            io.BytesIO(output.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error generando Excel: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generando Excel: {str(e)}")
