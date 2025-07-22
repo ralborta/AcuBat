@@ -52,6 +52,7 @@ try:
     from api.parser import ExcelParser, detect_and_parse_file, is_moura_file
     from api.models import Producto, Marca, Canal
     from api.rentabilidad_analyzer import RentabilidadAnalyzer, analizar_rentabilidades_2_canales
+    from api.moura_rentabilidad import analizar_rentabilidades_moura
     
     pricing_logic = PricingLogic()
     openai_helper = OpenAIHelper()
@@ -1038,15 +1039,15 @@ async def calcular_precios_con_rentabilidad():
             
             logger.info(f"✅ Archivo temporal creado: {temp_filename}")
             
-            # Analizar rentabilidades con la nueva función
+            # Analizar rentabilidades con el parser específico de Moura
             try:
-                analisis_rentabilidades = analizar_rentabilidades_2_canales(temp_filename)
-                logger.info(f"📊 Análisis de rentabilidades: {analisis_rentabilidades['resumen']}")
+                analisis_rentabilidades = analizar_rentabilidades_moura(temp_filename)
+                logger.info(f"📊 Análisis de rentabilidades Moura: {analisis_rentabilidades['resumen']}")
             except Exception as e:
-                logger.error(f"❌ Error analizando rentabilidades: {e}")
+                logger.error(f"❌ Error analizando rentabilidades Moura: {e}")
                 return {
                     "status": "error",
-                    "mensaje": f"Error analizando archivo de rentabilidades: {str(e)}",
+                    "mensaje": f"Error analizando archivo de rentabilidades Moura: {str(e)}",
                     "productos": 0,
                     "productos_detalle": [],
                     "pasos_completados": [],
@@ -1150,18 +1151,33 @@ async def calcular_precios_con_rentabilidad():
                 nombre = producto_precio['nombre']
                 precio_base = producto_precio['precio_base']
                 
-                # Buscar reglas para ambos canales
+                # Buscar reglas específicas por código de producto
                 regla_minorista = None
                 regla_mayorista = None
                 
-                # Buscar regla minorista (por índice de fila o usar la primera disponible)
-                if analisis_rentabilidades['reglas_minorista']:
-                    # Usar la primera regla como default, o buscar por código si es posible
-                    regla_minorista = analisis_rentabilidades['reglas_minorista'][0]
+                # Buscar regla minorista específica por código
+                for regla in analisis_rentabilidades['reglas_minorista']:
+                    if regla['codigo'] == codigo:
+                        regla_minorista = regla
+                        logger.info(f"✅ Regla Minorista encontrada para {codigo}: {regla['markup']}%")
+                        break
                 
-                # Buscar regla mayorista
-                if analisis_rentabilidades['reglas_mayorista']:
+                # Si no se encuentra regla específica, usar la primera disponible
+                if not regla_minorista and analisis_rentabilidades['reglas_minorista']:
+                    regla_minorista = analisis_rentabilidades['reglas_minorista'][0]
+                    logger.info(f"⚠️ Usando regla Minorista default para {codigo}: {regla_minorista['markup']}%")
+                
+                # Buscar regla mayorista específica por código
+                for regla in analisis_rentabilidades['reglas_mayorista']:
+                    if regla['codigo'] == codigo:
+                        regla_mayorista = regla
+                        logger.info(f"✅ Regla Mayorista encontrada para {codigo}: {regla['markup']}%")
+                        break
+                
+                # Si no se encuentra regla específica, usar la primera disponible
+                if not regla_mayorista and analisis_rentabilidades['reglas_mayorista']:
                     regla_mayorista = analisis_rentabilidades['reglas_mayorista'][0]
+                    logger.info(f"⚠️ Usando regla Mayorista default para {codigo}: {regla_mayorista['markup']}%")
                 
                 # Calcular precios para ambos canales
                 producto_resultado = {
@@ -1185,6 +1201,8 @@ async def calcular_precios_con_rentabilidad():
                         'margen': margen_minorista,
                         'estado': 'ÓPTIMO' if margen_minorista >= 20 else 'ADVERTENCIA' if margen_minorista >= 10 else 'CRÍTICO'
                     }
+                else:
+                    logger.warning(f"⚠️ No hay regla Minorista para {codigo}")
                 
                 # Canal Mayorista
                 if regla_mayorista:
@@ -1200,6 +1218,8 @@ async def calcular_precios_con_rentabilidad():
                         'margen': margen_mayorista,
                         'estado': 'ÓPTIMO' if margen_mayorista >= 20 else 'ADVERTENCIA' if margen_mayorista >= 10 else 'CRÍTICO'
                     }
+                else:
+                    logger.warning(f"⚠️ No hay regla Mayorista para {codigo}")
                 
                 productos_procesados.append(producto_resultado)
                 logger.info(f"✅ Producto {codigo} procesado: Minorista=${producto_resultado['canales'].get('minorista', {}).get('precio_final', 0)}, Mayorista=${producto_resultado['canales'].get('mayorista', {}).get('precio_final', 0)}")
