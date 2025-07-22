@@ -542,12 +542,25 @@ def _extraer_reglas_minorista(df: pd.DataFrame, seccion: Dict, hoja_nombre: str)
                 # Buscar en las primeras filas después del header para encontrar columnas con porcentajes
                 for i in range(fila_headers + 1, min(fila_headers + 10, len(df))):
                     try:
-                        valor = str(df.iloc[i, col_inicio + j])
-                        if '%' in valor or (valor.replace('.', '').replace(',', '').isdigit() and float(valor.replace(',', '.')) > 0 and float(valor.replace(',', '.')) < 200):
-                            # Es un porcentaje válido
-                            col_markup = col_inicio + j
-                            logger.info(f"📍 Columna Markup encontrada por valor: {valor} en columna {j}")
-                            break
+                        valor = str(df.iloc[i, col_inicio + j]).strip()
+                        # Limpiar el valor de caracteres especiales
+                        valor_limpio = valor.replace('%', '').replace(',', '.').replace(' ', '')
+                        
+                        # Verificar si es un número válido (incluyendo decimales)
+                        if valor_limpio.replace('.', '').isdigit():
+                            valor_num = float(valor_limpio)
+                            # Buscar valores que parezcan markups (entre 0.1 y 200)
+                            if 0.1 <= valor_num <= 200:
+                                col_markup = col_inicio + j
+                                logger.info(f"📍 Columna Markup encontrada por valor: {valor} (limpio: {valor_limpio}) en columna {j}")
+                                break
+                        # También buscar valores con formato de porcentaje
+                        elif '%' in valor and valor_limpio.replace('.', '').isdigit():
+                            valor_num = float(valor_limpio)
+                            if 0.1 <= valor_num <= 200:
+                                col_markup = col_inicio + j
+                                logger.info(f"📍 Columna Markup encontrada por porcentaje: {valor} en columna {j}")
+                                break
                     except:
                         continue
                 if col_markup is not None:
