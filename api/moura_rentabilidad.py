@@ -179,33 +179,33 @@ def _procesar_hoja_moura(df_moura) -> Dict:
             if col_markup_mayorista < len(df_moura.columns):
                 markup_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_mayorista])
                 rent_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_mayorista]) if col_rent_mayorista < len(df_moura.columns) else 0
-                if markup_mayorista > 0:
-                    regla_mayorista = {
-                        'codigo': codigo,
-                        'canal': 'Mayorista',
-                        'precio_base': precio_base,
-                        'markup': markup_mayorista,
-                        'rentabilidad': rent_mayorista,
-                        'fila': i,
-                        'hoja': 'Moura'
-                    }
-                    reglas_mayorista.append(regla_mayorista)
+                # Incluir TODOS los productos, incluso con markup 0
+                regla_mayorista = {
+                    'codigo': codigo,
+                    'canal': 'Mayorista',
+                    'precio_base': precio_base,
+                    'markup': markup_mayorista,
+                    'rentabilidad': rent_mayorista,
+                    'fila': i,
+                    'hoja': 'Moura'
+                }
+                reglas_mayorista.append(regla_mayorista)
             
             # Extraer datos Minorista (Columna Z - variable)
             if col_markup_minorista < len(df_moura.columns):
                 markup_minorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_minorista])
                 rent_minorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_minorista]) if col_rent_minorista < len(df_moura.columns) else 0
-                if markup_minorista > 0:
-                    regla_minorista = {
-                        'codigo': codigo,
-                        'canal': 'Minorista',
-                        'precio_base': precio_base,
-                        'markup': markup_minorista,
-                        'rentabilidad': rent_minorista,
-                        'fila': i,
-                        'hoja': 'Moura'
-                    }
-                    reglas_minorista.append(regla_minorista)
+                # Incluir TODOS los productos, incluso con markup 0
+                regla_minorista = {
+                    'codigo': codigo,
+                    'canal': 'Minorista',
+                    'precio_base': precio_base,
+                    'markup': markup_minorista,
+                    'rentabilidad': rent_minorista,
+                    'fila': i,
+                    'hoja': 'Moura'
+                }
+                reglas_minorista.append(regla_minorista)
                     
         except Exception as e:
             logger.warning(f"⚠️ Error procesando fila {i} en Moura: {e}")
