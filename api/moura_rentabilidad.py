@@ -154,58 +154,55 @@ def _procesar_hoja_varta(df_varta) -> Dict:
     }
 
 def _procesar_hoja_moura(df_moura) -> Dict:
-    """Procesa específicamente la hoja Moura"""
+    """Procesa específicamente la hoja Moura con la nueva estructura"""
     reglas_minorista = []
     reglas_mayorista = []
     
-    # Buscar columnas específicas de Moura (CORREGIDAS)
-    col_markup_mayorista = 16  # Columna R - Markup Mayorista (32.87%)
-    col_rent_mayorista = 17    # Columna S - Rentabilidad Mayorista
-    col_markup_minorista = 25  # Columna Z - Markup Minorista (variable)
-    col_rent_minorista = 26    # Columna AA - Rentabilidad Minorista
+    # Nueva estructura: columnas con nombres claros
+    # ['Código', 'Precio Base', 'Markup Minorista (%)', 'Rentabilidad Minorista (%)', 'Markup Mayorista (%)', 'Rentabilidad Mayorista (%)']
     
-    # Procesar productos desde la línea 3 en adelante
-    for i in range(2, len(df_moura)):
+    # Procesar todos los productos
+    for i in range(len(df_moura)):
         try:
-            codigo = str(df_moura.iloc[i, 0]).strip()
+            codigo = str(df_moura.iloc[i, 0]).strip()  # Columna 'Código'
             if not codigo or codigo == 'nan':
                 continue
             
-            precio_base = _convertir_precio(df_moura.iloc[i, 1])
-            if not precio_base:
+            precio_base = df_moura.iloc[i, 1]  # Columna 'Precio Base'
+            if pd.isna(precio_base) or precio_base <= 0:
                 continue
             
-            # Extraer datos Mayorista (Columna R - 32.87%)
-            if col_markup_mayorista < len(df_moura.columns):
-                markup_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_mayorista])
-                rent_mayorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_mayorista]) if col_rent_mayorista < len(df_moura.columns) else 0
-                # Incluir TODOS los productos, incluso con markup 0
-                regla_mayorista = {
-                    'codigo': codigo,
-                    'canal': 'Mayorista',
-                    'precio_base': precio_base,
-                    'markup': markup_mayorista,
-                    'rentabilidad': rent_mayorista,
-                    'fila': i,
-                    'hoja': 'Moura'
-                }
-                reglas_mayorista.append(regla_mayorista)
+            # Datos Minorista
+            markup_minorista = df_moura.iloc[i, 2]  # Columna 'Markup Minorista (%)'
+            rentabilidad_minorista = df_moura.iloc[i, 3]  # Columna 'Rentabilidad Minorista (%)'
             
-            # Extraer datos Minorista (Columna Z - variable)
-            if col_markup_minorista < len(df_moura.columns):
-                markup_minorista = _convertir_porcentaje(df_moura.iloc[i, col_markup_minorista])
-                rent_minorista = _convertir_porcentaje(df_moura.iloc[i, col_rent_minorista]) if col_rent_minorista < len(df_moura.columns) else 0
-                # Incluir TODOS los productos, incluso con markup 0
-                regla_minorista = {
-                    'codigo': codigo,
-                    'canal': 'Minorista',
-                    'precio_base': precio_base,
-                    'markup': markup_minorista,
-                    'rentabilidad': rent_minorista,
-                    'fila': i,
-                    'hoja': 'Moura'
-                }
-                reglas_minorista.append(regla_minorista)
+            # Datos Mayorista
+            markup_mayorista = df_moura.iloc[i, 4]  # Columna 'Markup Mayorista (%)'
+            rentabilidad_mayorista = df_moura.iloc[i, 5]  # Columna 'Rentabilidad Mayorista (%)'
+            
+            # Crear regla Minorista
+            regla_minorista = {
+                'codigo': codigo,
+                'canal': 'Minorista',
+                'precio_base': float(precio_base),
+                'markup': float(markup_minorista) if pd.notna(markup_minorista) else 0.0,
+                'rentabilidad': float(rentabilidad_minorista) if pd.notna(rentabilidad_minorista) else 0.0,
+                'fila': i,
+                'hoja': 'Moura'
+            }
+            reglas_minorista.append(regla_minorista)
+            
+            # Crear regla Mayorista
+            regla_mayorista = {
+                'codigo': codigo,
+                'canal': 'Mayorista',
+                'precio_base': float(precio_base),
+                'markup': float(markup_mayorista) if pd.notna(markup_mayorista) else 0.0,
+                'rentabilidad': float(rentabilidad_mayorista) if pd.notna(rentabilidad_mayorista) else 0.0,
+                'fila': i,
+                'hoja': 'Moura'
+            }
+            reglas_mayorista.append(regla_mayorista)
                     
         except Exception as e:
             logger.warning(f"⚠️ Error procesando fila {i} en Moura: {e}")
