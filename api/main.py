@@ -1248,7 +1248,7 @@ async def calcular_precios_con_rentabilidad():
             "status": "success",
             "mensaje": f"✅ Proceso completado exitosamente - {len(productos_procesados)} productos procesados",
             "productos": len(productos_procesados),
-            "productos_detalle": productos_procesados[:10],  # Solo los primeros 10 para la respuesta
+            "productos_detalle": productos_procesados,  # TODOS los productos procesados
             "pasos_completados": pasos_completados,
             "resumen": resumen
         }
