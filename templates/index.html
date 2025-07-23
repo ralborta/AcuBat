@@ -1930,22 +1930,29 @@
             
             // Resumen del análisis
             html += '<div class="row mb-3">';
-            html += '<div class="col-md-4">';
+            html += '<div class="col-md-3">';
             html += '<div class="text-center">';
             html += `<h4 class="text-primary">${data.total_productos}</h4>`;
             html += '<p class="text-muted">Total Productos</p>';
             html += '</div></div>';
             
-            html += '<div class="col-md-4">';
+            html += '<div class="col-md-3">';
             html += '<div class="text-center">';
-            html += `<h4 class="text-warning">${data.productos_criticos}</h4>`;
+            html += `<h4 class="text-danger">${data.productos_criticos}</h4>`;
             html += '<p class="text-muted">Productos Críticos</p>';
             html += '</div></div>';
             
-            html += '<div class="col-md-4">';
+            html += '<div class="col-md-3">';
             html += '<div class="text-center">';
-            html += `<h4 class="text-info">${data.productos_advertencia}</h4>`;
+            html += `<h4 class="text-warning">${data.productos_advertencia}</h4>`;
             html += '<p class="text-muted">Con Advertencias</p>';
+            html += '</div></div>';
+            
+            html += '<div class="col-md-3">';
+            html += '<div class="text-center">';
+            html += '<button class="btn btn-modern btn-ai-modern" onclick="descargarReporteIA()">';
+            html += '<i class="fas fa-download"></i> 📄 Descargar Reporte';
+            html += '</button>';
             html += '</div></div>';
             html += '</div>';
             
@@ -1958,15 +1965,31 @@
                     html += '<div class="card-body">';
                     html += `<h6 class="card-title">${sugerencia.codigo} - ${sugerencia.nombre}</h6>`;
                     
-                    // Estado actual
+                    // Estado actual y canal
                     html += '<div class="row mb-2">';
-                    html += '<div class="col-md-6">';
-                    html += '<small class="text-muted">Estado Actual:</small><br>';
+                    html += '<div class="col-md-4">';
+                    html += '<small class="text-muted">Estado:</small><br>';
                     html += `<span class="badge bg-${sugerencia.estado === 'CRÍTICO' ? 'danger' : sugerencia.estado === 'ADVERTENCIA' ? 'warning' : 'success'}">${sugerencia.estado}</span>`;
                     html += '</div>';
-                    html += '<div class="col-md-6">';
+                    html += '<div class="col-md-4">';
+                    html += '<small class="text-muted">Canal con Problema:</small><br>';
+                    html += `<strong class="text-${sugerencia.canal_problema === 'Minorista' ? 'success' : 'primary'}">${sugerencia.canal_problema}</strong>`;
+                    html += '</div>';
+                    html += '<div class="col-md-4">';
                     html += '<small class="text-muted">Margen Actual:</small><br>';
                     html += `<strong>${sugerencia.margen_actual}%</strong>`;
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    // Márgenes por canal
+                    html += '<div class="row mb-3">';
+                    html += '<div class="col-md-6">';
+                    html += '<small class="text-muted">Margen Minorista:</small><br>';
+                    html += `<span class="badge bg-${sugerencia.margen_minorista < 10 ? 'danger' : sugerencia.margen_minorista < 20 ? 'warning' : 'success'}">${sugerencia.margen_minorista}%</span>`;
+                    html += '</div>';
+                    html += '<div class="col-md-6">';
+                    html += '<small class="text-muted">Margen Mayorista:</small><br>';
+                    html += `<span class="badge bg-${sugerencia.margen_mayorista < 10 ? 'danger' : sugerencia.margen_mayorista < 20 ? 'warning' : 'success'}">${sugerencia.margen_mayorista}%</span>`;
                     html += '</div>';
                     html += '</div>';
                     
@@ -1997,6 +2020,49 @@
             
             resultadosDiv.innerHTML = html;
             document.getElementById('resultsSection').style.display = 'block';
+            
+            // Guardar datos para descarga
+            window.analisisIAData = data;
+        }
+
+        function descargarReporteIA() {
+            if (!window.analisisIAData) {
+                mostrarAlerta('warning', '⚠️ No hay datos de análisis IA para descargar', 'analisisStatus');
+                return;
+            }
+            
+            mostrarCarga('📄 Generando reporte...');
+            
+            fetch('/api/descargar-reporte-ia', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(window.analisisIAData)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('Error generando reporte');
+            })
+            .then(blob => {
+                ocultarCarga();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `analisis_ia_${new Date().toISOString().slice(0,10)}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                mostrarAlerta('success', '✅ Reporte descargado exitosamente', 'analisisStatus');
+            })
+            .catch(error => {
+                console.error('Error descargando reporte:', error);
+                ocultarCarga();
+                mostrarAlerta('danger', '❌ Error al descargar reporte', 'analisisStatus');
+            });
         }
     </script>
 </body>

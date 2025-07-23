@@ -1547,36 +1547,49 @@ async def analisis_ia_inteligente():
             nombre = producto.get('nombre', '')
             precio_base = producto['precio_base']
             
-            # Obtener el peor estado entre ambos canales
+            # Obtener información de ambos canales
             canales = producto.get('canales', {})
             minorista = canales.get('minorista', {})
             mayorista = canales.get('mayorista', {})
             
             estado_minorista = minorista.get('estado', 'ÓPTIMO')
             estado_mayorista = mayorista.get('estado', 'ÓPTIMO')
-            
-            # Determinar el estado más crítico
-            estados = [estado_minorista, estado_mayorista]
-            if 'CRÍTICO' in estados:
-                estado = 'CRÍTICO'
-            elif 'ADVERTENCIA' in estados:
-                estado = 'ADVERTENCIA'
-            else:
-                estado = 'ÓPTIMO'
-            
-            # Calcular margen promedio
             margen_minorista = minorista.get('margen', 0)
             margen_mayorista = mayorista.get('margen', 0)
-            margen_promedio = (margen_minorista + margen_mayorista) / 2
             
-            # Generar sugerencias de precio
-            sugerencias_precio = generar_sugerencias_precio(precio_base, margen_promedio)
+            # Determinar el estado más crítico y canal correspondiente
+            if estado_minorista == 'CRÍTICO' or estado_mayorista == 'CRÍTICO':
+                estado = 'CRÍTICO'
+                if estado_minorista == 'CRÍTICO':
+                    canal_problema = 'Minorista'
+                    margen_problema = margen_minorista
+                else:
+                    canal_problema = 'Mayorista'
+                    margen_problema = margen_mayorista
+            elif estado_minorista == 'ADVERTENCIA' or estado_mayorista == 'ADVERTENCIA':
+                estado = 'ADVERTENCIA'
+                if estado_minorista == 'ADVERTENCIA':
+                    canal_problema = 'Minorista'
+                    margen_problema = margen_minorista
+                else:
+                    canal_problema = 'Mayorista'
+                    margen_problema = margen_mayorista
+            else:
+                estado = 'ÓPTIMO'
+                canal_problema = 'N/A'
+                margen_problema = 0
+            
+            # Generar sugerencias de precio para el canal con problema
+            sugerencias_precio = generar_sugerencias_precio(precio_base, margen_problema)
             
             sugerencias.append({
                 'codigo': codigo,
                 'nombre': nombre,
                 'estado': estado,
-                'margen_actual': round(margen_promedio, 2),
+                'canal_problema': canal_problema,
+                'margen_actual': round(margen_problema, 2),
+                'margen_minorista': round(margen_minorista, 2),
+                'margen_mayorista': round(margen_mayorista, 2),
                 'sugerencias_precio': sugerencias_precio
             })
         
@@ -1641,3 +1654,83 @@ def generar_sugerencias_precio(precio_base: float, margen_actual: float) -> list
     })
     
     return sugerencias
+
+@app.post("/api/descargar-reporte-ia")
+async def descargar_reporte_ia(data: dict):
+    """
+    Genera y descarga un reporte Word con el análisis IA
+    """
+    try:
+        logger.info("📄 Generando reporte IA...")
+        
+        # Crear contenido del reporte
+        contenido = f"""
+# Reporte de Análisis IA Inteligente - AcuBat
+
+**Fecha de generación:** {datetime.now().strftime("%d/%m/%Y %H:%M")}
+**Total de productos analizados:** {data.get('total_productos', 0)}
+
+## Resumen Ejecutivo
+
+- **Productos críticos:** {data.get('productos_criticos', 0)}
+- **Productos con advertencias:** {data.get('productos_advertencia', 0)}
+- **Productos óptimos:** {data.get('total_productos', 0) - data.get('productos_criticos', 0) - data.get('productos_advertencia', 0)}
+
+## Análisis Detallado por Producto
+
+"""
+        
+        # Agregar análisis por producto
+        for sugerencia in data.get('sugerencias', []):
+            contenido += f"""
+### {sugerencia['codigo']} - {sugerencia['nombre']}
+
+**Estado:** {sugerencia['estado']}
+**Canal con problema:** {sugerencia['canal_problema']}
+**Margen actual:** {sugerencia['margen_actual']}%
+**Margen Minorista:** {sugerencia['margen_minorista']}%
+**Margen Mayorista:** {sugerencia['margen_mayorista']}%
+
+#### Sugerencias de Precio:
+
+"""
+            
+            for sug in sugerencia.get('sugerencias_precio', []):
+                contenido += f"""
+**{sug['tipo']}:**
+- Precio sugerido: ${sug['precio_sugerido']:,.0f}
+- Mejora de margen: +{sug['mejora_margen']}%
+
+"""
+        
+        contenido += f"""
+## Recomendaciones Generales
+
+1. **Productos Críticos:** Priorizar la revisión de precios para productos con margen menor al 10%
+2. **Productos con Advertencias:** Considerar ajustes moderados para productos con margen entre 10-20%
+3. **Optimización Continua:** Monitorear regularmente los márgenes y ajustar precios según sea necesario
+
+---
+*Reporte generado automáticamente por el Sistema de Pricing Inteligente AcuBat*
+"""
+        
+        # Crear archivo de texto (simulado como Word)
+        output = io.BytesIO()
+        output.write(contenido.encode('utf-8'))
+        output.seek(0)
+        
+        # Generar nombre de archivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"analisis_ia_{timestamp}.txt"
+        
+        logger.info(f"✅ Reporte IA generado: {filename}")
+        
+        return StreamingResponse(
+            output,
+            media_type="text/plain",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error generando reporte IA: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
