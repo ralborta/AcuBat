@@ -1076,7 +1076,7 @@
             
             // Tabla de productos con ambos canales
             let tablaHTML = '<div class="card">';
-            tablaHTML += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
+            tablaHTML += '<div class="card-header">📋 Productos Calculados (Todos)</div>';
             tablaHTML += '<div class="card-body">';
             tablaHTML += '<div class="table-responsive">';
             tablaHTML += '<table class="table table-striped table-hover">';
@@ -1104,8 +1104,8 @@
             tablaHTML += '</thead>';
             tablaHTML += '<tbody>';
             
-            // Mostrar productos (máximo 10)
-            const productosAMostrar = data.productos_detalle.slice(0, 10);
+            // Mostrar TODOS los productos (no solo 10)
+            const productosAMostrar = data.productos_detalle;
             
             productosAMostrar.forEach(producto => {
                 const minorista = producto.canales?.minorista || {};
@@ -1124,18 +1124,18 @@
                 tablaHTML += '<tr>';
                 tablaHTML += `<td><strong>${producto.codigo}</strong></td>`;
                 tablaHTML += `<td>${producto.nombre}</td>`;
-                tablaHTML += `<td>$${producto.precio_base.toLocaleString()}</td>`;
+                tablaHTML += `<td>${producto.precio_base.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
                 
                 // Datos Minorista
-                tablaHTML += `<td class="text-success">$${minorista.precio_final ? minorista.precio_final.toLocaleString() : 'N/A'}</td>`;
-                tablaHTML += `<td class="text-success">${minorista.markup_aplicado ? minorista.markup_aplicado.toFixed(1) + '%' : 'N/A'}</td>`;
-                tablaHTML += `<td class="text-success">${minorista.rentabilidad ? minorista.rentabilidad.toFixed(1) + '%' : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-success">${minorista.precio_final ? minorista.precio_final.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-success">${minorista.markup_aplicado ? minorista.markup_aplicado.toFixed(2).replace('.', ',') : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-success">${minorista.rentabilidad ? minorista.rentabilidad.toFixed(2).replace('.', ',') : 'N/A'}</td>`;
                 tablaHTML += `<td class="${estadoMinoristaClass}"><strong>${minorista.estado || 'N/A'}</strong></td>`;
                 
                 // Datos Mayorista
-                tablaHTML += `<td class="text-warning">$${mayorista.precio_final ? mayorista.precio_final.toLocaleString() : 'N/A'}</td>`;
-                tablaHTML += `<td class="text-warning">${mayorista.markup_aplicado ? mayorista.markup_aplicado.toFixed(1) + '%' : 'N/A'}</td>`;
-                tablaHTML += `<td class="text-warning">${mayorista.rentabilidad ? mayorista.rentabilidad.toFixed(1) + '%' : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-warning">${mayorista.precio_final ? mayorista.precio_final.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-warning">${mayorista.markup_aplicado ? mayorista.markup_aplicado.toFixed(2).replace('.', ',') : 'N/A'}</td>`;
+                tablaHTML += `<td class="text-warning">${mayorista.rentabilidad ? mayorista.rentabilidad.toFixed(2).replace('.', ',') : 'N/A'}</td>`;
                 tablaHTML += `<td class="${estadoMayoristaClass}"><strong>${mayorista.estado || 'N/A'}</strong></td>`;
                 
                 tablaHTML += '</tr>';
@@ -1208,7 +1208,7 @@
             if (data.productos_detalle && data.productos_detalle.length > 0) {
                 console.log('✅ Mostrando tabla de productos con', data.productos_detalle.length, 'productos');
                 html += '<div class="card">';
-                html += '<div class="card-header">📋 Productos Calculados (Primeros 10)</div>';
+                html += '<div class="card-header">📋 Productos Calculados (Todos)</div>';
                 html += '<div class="card-body">';
                 html += '<div class="table-responsive">';
                 html += '<table class="table table-striped table-hover">';
@@ -1235,7 +1235,7 @@
                     html += '<tr>';
                     html += `<td><strong>${producto.codigo}</strong></td>`;
                     html += `<td>${producto.nombre}</td>`;
-                    html += `<td>$${producto.precio_base.toFixed(2)}</td>`;
+                    html += `<td>${producto.precio_base.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
                     html += `<td>$${producto.precio_final.toFixed(2)}</td>`;
                     html += `<td>${producto.margen.toFixed(1)}%</td>`;
                     html += `<td><span class="badge bg-${estadoClass}"><i class="fas fa-${estadoIcon}"></i> ${producto.estado}</span></td>`;
