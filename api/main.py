@@ -1458,13 +1458,13 @@ async def descargar_excel(data: dict):
             for col in ['C', 'D', 'H']:  # Precio Base, Precio Minorista, Precio Mayorista
                 for row in range(2, len(productos) + 2):
                     cell = worksheet[f'{col}{row}']
-                    cell.number_format = '$#,##0'
+                    cell.number_format = '#,##0'  # Formato con punto millar
             
             # Formatear columnas de porcentajes
             for col in ['E', 'F', 'I', 'J']:  # Markups y Rentabilidades
                 for row in range(2, len(productos) + 2):
                     cell = worksheet[f'{col}{row}']
-                    cell.number_format = '0.00%'
+                    cell.number_format = '0.0%'  # Formato de porcentaje con coma decimal
             
             # Ajustar ancho de columnas
             for column in worksheet.columns:

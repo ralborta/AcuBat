@@ -1741,21 +1741,38 @@
                         filas.forEach(fila => {
                             const celdas = fila.querySelectorAll('td');
                             if (celdas.length >= 11) { // Verificar que tenga todas las columnas
+                                
+                                // Función para parsear precios correctamente
+                                const parsearPrecio = (texto) => {
+                                    if (!texto) return 0;
+                                    // Remover $ y espacios, convertir punto millar y coma decimal
+                                    const limpio = texto.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.');
+                                    return parseFloat(limpio) || 0;
+                                };
+                                
+                                // Función para parsear porcentajes correctamente
+                                const parsearPorcentaje = (texto) => {
+                                    if (!texto) return 0;
+                                    // Remover % y espacios, convertir coma decimal
+                                    const limpio = texto.replace(/[%\s]/g, '').replace(',', '.');
+                                    return parseFloat(limpio) || 0;
+                                };
+                                
                                 const producto = {
                                     codigo: celdas[0].textContent.trim(),
                                     nombre: celdas[1].textContent.trim(),
-                                    precio_base: parseFloat(celdas[2].textContent.replace(/[$,]/g, '')),
+                                    precio_base: parsearPrecio(celdas[2].textContent),
                                     canales: {
                                         minorista: {
-                                            precio_final: parseFloat(celdas[3].textContent.replace(/[$,]/g, '')),
-                                            markup_aplicado: parseFloat(celdas[4].textContent.replace('%', '')),
-                                            rentabilidad: parseFloat(celdas[5].textContent.replace('%', '')),
+                                            precio_final: parsearPrecio(celdas[3].textContent),
+                                            markup_aplicado: parsearPorcentaje(celdas[4].textContent),
+                                            rentabilidad: parsearPorcentaje(celdas[5].textContent),
                                             estado: celdas[6].textContent.trim()
                                         },
                                         mayorista: {
-                                            precio_final: parseFloat(celdas[7].textContent.replace(/[$,]/g, '')),
-                                            markup_aplicado: parseFloat(celdas[8].textContent.replace('%', '')),
-                                            rentabilidad: parseFloat(celdas[9].textContent.replace('%', '')),
+                                            precio_final: parsearPrecio(celdas[7].textContent),
+                                            markup_aplicado: parsearPorcentaje(celdas[8].textContent),
+                                            rentabilidad: parsearPorcentaje(celdas[9].textContent),
                                             estado: celdas[10].textContent.trim()
                                         }
                                     }
