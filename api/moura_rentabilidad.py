@@ -154,39 +154,50 @@ def _procesar_hoja_varta(df_varta) -> Dict:
     }
 
 def _procesar_hoja_moura(df_moura) -> Dict:
-    """Procesa específicamente la hoja Moura con la nueva estructura"""
+    """Procesa específicamente la hoja Moura con la estructura completa"""
     reglas_minorista = []
     reglas_mayorista = []
     
-    # Nueva estructura: columnas con nombres claros
-    # ['Código', 'Precio Base', 'Markup Minorista (%)', 'Rentabilidad Minorista (%)', 'Markup Mayorista (%)', 'Rentabilidad Mayorista (%)']
+    # Estructura completa del archivo:
+    # Columna 0: Código
+    # Columna 1: P. Base
+    # Columna 16: Markup Mayorista (decimal, ej: 0.1934 = 19.34%)
+    # Columna 17: Rentabilidad Mayorista (decimal, ej: 0.0805 = 8.05%)
+    # Columna 25: Markup Minorista (decimal, ej: 0.5998 = 59.98%)
+    # Columna 26: Rentabilidad Minorista (decimal, ej: 0.3749 = 37.49%)
     
-    # Procesar todos los productos
-    for i in range(len(df_moura)):
+    # Procesar todos los productos (empezar desde fila 2 para saltar headers)
+    for i in range(2, len(df_moura)):
         try:
             codigo = str(df_moura.iloc[i, 0]).strip()  # Columna 'Código'
-            if not codigo or codigo == 'nan':
+            if not codigo or codigo == 'nan' or not codigo.startswith('M'):
                 continue
             
-            precio_base = df_moura.iloc[i, 1]  # Columna 'Precio Base'
+            precio_base = df_moura.iloc[i, 1]  # Columna 'P. Base'
             if pd.isna(precio_base) or precio_base <= 0:
                 continue
             
-            # Datos Minorista
-            markup_minorista = df_moura.iloc[i, 2]  # Columna 'Markup Minorista (%)'
-            rentabilidad_minorista = df_moura.iloc[i, 3]  # Columna 'Rentabilidad Minorista (%)'
+            # Datos Mayorista (columnas 16 y 17)
+            markup_mayorista_raw = df_moura.iloc[i, 16]  # Columna 16 - Markup Mayorista
+            rentabilidad_mayorista_raw = df_moura.iloc[i, 17]  # Columna 17 - Rentabilidad Mayorista
             
-            # Datos Mayorista
-            markup_mayorista = df_moura.iloc[i, 4]  # Columna 'Markup Mayorista (%)'
-            rentabilidad_mayorista = df_moura.iloc[i, 5]  # Columna 'Rentabilidad Mayorista (%)'
+            # Datos Minorista (columnas 25 y 26)
+            markup_minorista_raw = df_moura.iloc[i, 25]  # Columna 25 - Markup Minorista
+            rentabilidad_minorista_raw = df_moura.iloc[i, 26]  # Columna 26 - Rentabilidad Minorista
+            
+            # Convertir de decimal a porcentaje
+            markup_mayorista = float(markup_mayorista_raw) * 100 if pd.notna(markup_mayorista_raw) else 0.0
+            rentabilidad_mayorista = float(rentabilidad_mayorista_raw) * 100 if pd.notna(rentabilidad_mayorista_raw) else 0.0
+            markup_minorista = float(markup_minorista_raw) * 100 if pd.notna(markup_minorista_raw) else 0.0
+            rentabilidad_minorista = float(rentabilidad_minorista_raw) * 100 if pd.notna(rentabilidad_minorista_raw) else 0.0
             
             # Crear regla Minorista
             regla_minorista = {
                 'codigo': codigo,
                 'canal': 'Minorista',
                 'precio_base': float(precio_base),
-                'markup': float(markup_minorista) if pd.notna(markup_minorista) else 0.0,
-                'rentabilidad': float(rentabilidad_minorista) if pd.notna(rentabilidad_minorista) else 0.0,
+                'markup': markup_minorista,
+                'rentabilidad': rentabilidad_minorista,
                 'fila': i,
                 'hoja': 'Moura'
             }
@@ -197,8 +208,8 @@ def _procesar_hoja_moura(df_moura) -> Dict:
                 'codigo': codigo,
                 'canal': 'Mayorista',
                 'precio_base': float(precio_base),
-                'markup': float(markup_mayorista) if pd.notna(markup_mayorista) else 0.0,
-                'rentabilidad': float(rentabilidad_mayorista) if pd.notna(rentabilidad_mayorista) else 0.0,
+                'markup': markup_mayorista,
+                'rentabilidad': rentabilidad_mayorista,
                 'fila': i,
                 'hoja': 'Moura'
             }
