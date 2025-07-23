@@ -1498,3 +1498,146 @@ async def descargar_excel(data: dict):
     except Exception as e:
         logger.error(f"❌ Error generando Excel: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando Excel: {str(e)}")
+
+@app.post("/api/analisis-ia-inteligente")
+async def analisis_ia_inteligente():
+    """
+    Análisis IA inteligente de productos críticos y con advertencias
+    """
+    try:
+        logger.info("🤖 Iniciando análisis IA inteligente...")
+        
+        # Verificar que tenemos datos
+        if not productos_actuales:
+            return {
+                "status": "error",
+                "mensaje": "No hay productos calculados. Primero debes calcular los precios."
+            }
+        
+        # Filtrar productos críticos y con advertencias
+        productos_criticos = []
+        productos_advertencia = []
+        
+        for producto in productos_actuales:
+            canales = producto.get('canales', {})
+            
+            # Verificar canal minorista
+            minorista = canales.get('minorista', {})
+            if minorista.get('estado') == 'CRÍTICO':
+                productos_criticos.append(producto)
+            elif minorista.get('estado') == 'ADVERTENCIA':
+                productos_advertencia.append(producto)
+            
+            # Verificar canal mayorista
+            mayorista = canales.get('mayorista', {})
+            if mayorista.get('estado') == 'CRÍTICO':
+                productos_criticos.append(producto)
+            elif mayorista.get('estado') == 'ADVERTENCIA':
+                productos_advertencia.append(producto)
+        
+        # Eliminar duplicados
+        productos_criticos = list({p['codigo']: p for p in productos_criticos}.values())
+        productos_advertencia = list({p['codigo']: p for p in productos_advertencia}.values())
+        
+        # Generar sugerencias para productos críticos y con advertencias
+        sugerencias = []
+        
+        for producto in productos_criticos + productos_advertencia:
+            codigo = producto['codigo']
+            nombre = producto.get('nombre', '')
+            precio_base = producto['precio_base']
+            
+            # Obtener el peor estado entre ambos canales
+            canales = producto.get('canales', {})
+            minorista = canales.get('minorista', {})
+            mayorista = canales.get('mayorista', {})
+            
+            estado_minorista = minorista.get('estado', 'ÓPTIMO')
+            estado_mayorista = mayorista.get('estado', 'ÓPTIMO')
+            
+            # Determinar el estado más crítico
+            estados = [estado_minorista, estado_mayorista]
+            if 'CRÍTICO' in estados:
+                estado = 'CRÍTICO'
+            elif 'ADVERTENCIA' in estados:
+                estado = 'ADVERTENCIA'
+            else:
+                estado = 'ÓPTIMO'
+            
+            # Calcular margen promedio
+            margen_minorista = minorista.get('margen', 0)
+            margen_mayorista = mayorista.get('margen', 0)
+            margen_promedio = (margen_minorista + margen_mayorista) / 2
+            
+            # Generar sugerencias de precio
+            sugerencias_precio = generar_sugerencias_precio(precio_base, margen_promedio)
+            
+            sugerencias.append({
+                'codigo': codigo,
+                'nombre': nombre,
+                'estado': estado,
+                'margen_actual': round(margen_promedio, 2),
+                'sugerencias_precio': sugerencias_precio
+            })
+        
+        # Ordenar por estado (críticos primero)
+        sugerencias.sort(key=lambda x: {'CRÍTICO': 0, 'ADVERTENCIA': 1, 'ÓPTIMO': 2}[x['estado']])
+        
+        logger.info(f"🤖 Análisis IA completado: {len(productos_criticos)} críticos, {len(productos_advertencia)} con advertencias")
+        
+        return {
+            "status": "success",
+            "mensaje": f"Análisis IA completado. {len(productos_criticos)} productos críticos, {len(productos_advertencia)} con advertencias.",
+            "total_productos": len(productos_actuales),
+            "productos_criticos": len(productos_criticos),
+            "productos_advertencia": len(productos_advertencia),
+            "sugerencias": sugerencias
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error en análisis IA: {e}")
+        return {
+            "status": "error",
+            "mensaje": f"Error en análisis IA: {str(e)}"
+        }
+
+def generar_sugerencias_precio(precio_base: float, margen_actual: float) -> list:
+    """
+    Genera sugerencias de precio para mejorar el margen
+    """
+    sugerencias = []
+    
+    # Sugerencia conservadora: mejorar margen en 5%
+    margen_objetivo_conservador = min(margen_actual + 5, 25)
+    precio_conservador = precio_base / (1 - margen_objetivo_conservador / 100)
+    precio_conservador = round(precio_conservador / 100) * 100  # Redondear a múltiplos de 100
+    
+    sugerencias.append({
+        'tipo': 'Conservadora',
+        'precio_sugerido': precio_conservador,
+        'mejora_margen': round(margen_objetivo_conservador - margen_actual, 2)
+    })
+    
+    # Sugerencia moderada: mejorar margen en 10%
+    margen_objetivo_moderado = min(margen_actual + 10, 30)
+    precio_moderado = precio_base / (1 - margen_objetivo_moderado / 100)
+    precio_moderado = round(precio_moderado / 100) * 100
+    
+    sugerencias.append({
+        'tipo': 'Moderada',
+        'precio_sugerido': precio_moderado,
+        'mejora_margen': round(margen_objetivo_moderado - margen_actual, 2)
+    })
+    
+    # Sugerencia agresiva: mejorar margen en 15%
+    margen_objetivo_agresivo = min(margen_actual + 15, 35)
+    precio_agresivo = precio_base / (1 - margen_objetivo_agresivo / 100)
+    precio_agresivo = round(precio_agresivo / 100) * 100
+    
+    sugerencias.append({
+        'tipo': 'Agresiva',
+        'precio_sugerido': precio_agresivo,
+        'mejora_margen': round(margen_objetivo_agresivo - margen_actual, 2)
+    })
+    
+    return sugerencias
