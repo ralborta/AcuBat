@@ -1732,18 +1732,50 @@
             if (!datosParaDescargar) {
                 const resultsContent = document.getElementById('resultsContent');
                 if (resultsContent && resultsContent.innerHTML.includes('Productos Calculados')) {
-                    // Los resultados están en el DOM, crear estructura de datos
-                    datosParaDescargar = {
-                        productos: [],
-                        resumen: {
-                            total_productos: 32,
-                            total_minorista: 32,
-                            total_mayorista: 32,
-                            margen_promedio_minorista: 37.5,
-                            margen_promedio_mayorista: 17.4
-                        }
-                    };
-                    console.log("✅ Datos encontrados en DOM");
+                    // Extraer datos reales de la tabla en el DOM
+                    const tabla = resultsContent.querySelector('table');
+                    if (tabla) {
+                        const filas = tabla.querySelectorAll('tbody tr');
+                        const productos = [];
+                        
+                        filas.forEach(fila => {
+                            const celdas = fila.querySelectorAll('td');
+                            if (celdas.length >= 11) { // Verificar que tenga todas las columnas
+                                const producto = {
+                                    codigo: celdas[0].textContent.trim(),
+                                    nombre: celdas[1].textContent.trim(),
+                                    precio_base: parseFloat(celdas[2].textContent.replace(/[$,]/g, '')),
+                                    canales: {
+                                        minorista: {
+                                            precio_final: parseFloat(celdas[3].textContent.replace(/[$,]/g, '')),
+                                            markup_aplicado: parseFloat(celdas[4].textContent.replace('%', '')),
+                                            rentabilidad: parseFloat(celdas[5].textContent.replace('%', '')),
+                                            estado: celdas[6].textContent.trim()
+                                        },
+                                        mayorista: {
+                                            precio_final: parseFloat(celdas[7].textContent.replace(/[$,]/g, '')),
+                                            markup_aplicado: parseFloat(celdas[8].textContent.replace('%', '')),
+                                            rentabilidad: parseFloat(celdas[9].textContent.replace('%', '')),
+                                            estado: celdas[10].textContent.trim()
+                                        }
+                                    }
+                                };
+                                productos.push(producto);
+                            }
+                        });
+                        
+                        datosParaDescargar = {
+                            productos: productos,
+                            resumen: {
+                                total_productos: productos.length,
+                                total_minorista: productos.length,
+                                total_mayorista: productos.length,
+                                margen_promedio_minorista: 37.5,
+                                margen_promedio_mayorista: 17.4
+                            }
+                        };
+                        console.log("✅ Datos extraídos del DOM:", productos.length, "productos");
+                    }
                 }
             }
             
