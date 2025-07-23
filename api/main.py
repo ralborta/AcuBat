@@ -7,6 +7,7 @@
 # FORZAR REBUILD - Vercel necesita detectar cambios en main.py para incluir rentabilidad_analyzer.py
 # ROLLBACK EXITOSO - Volvimos a la versión estable 334126c - FORZAR DEPLOY
 # VERIFICAR DEPLOY - Forzar detección de cambios en Vercel
+# ROLLBACK EXITOSO - Volvimos a la versión funcional con descarga de reportes
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
