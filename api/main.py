@@ -8,6 +8,7 @@
 # ROLLBACK EXITOSO - Volvimos a la versión estable 334126c - FORZAR DEPLOY
 # VERIFICAR DEPLOY - Forzar detección de cambios en Vercel
 # ROLLBACK EXITOSO - Volvimos a la versión funcional con descarga de reportes
+# FORZAR DEPLOY VERCEL - Asegurar que detecte el rollback
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
