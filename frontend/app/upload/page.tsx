@@ -208,7 +208,7 @@ export default function UploadPage() {
             </ul>
             <p className="mt-4 text-xs text-gray-500">
               Los nombres de las columnas pueden variar. El sistema detectará automáticamente
-              las columnas equivalentes (ej: "codigo" = SKU, "precio_lista" = Precio Base).
+              las columnas equivalentes (ej: &quot;codigo&quot; = SKU, &quot;precio_lista&quot; = Precio Base).
             </p>
           </div>
         </CardContent>
