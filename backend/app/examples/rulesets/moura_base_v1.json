@@ -1,0 +1,28 @@
+{
+  "name": "moura_base",
+  "version": "v1",
+  "appliesTo": { "brand": "Moura" },
+  "globals": {
+    "IVA": 0.21,
+    "L": 0.05,
+    "M": 0.00,
+    "N": 0.00,
+    "roundingPublic": "ceil50"
+  },
+  "steps": [
+    { "var": "precio_lista", "from": "base_price" },
+    { "var": "desc1", "value": 0.50 },
+    { "var": "neto1", "expr": "precio_lista * (1 - desc1)" },
+    { "var": "desc_contado", "value": 0.06 },
+    { "var": "K", "expr": "neto1 * (1 - desc_contado)" },
+    { "var": "P", "expr": "K - (K*L) - (K*M) - (K*N)" },
+    { "var": "precio_publico_bruto", "expr": "K * (1 + IVA)" },
+    { "var": "precio_publico", "expr": "rounding(precio_publico_bruto, roundingPublic)" },
+    { "var": "precio_publico_sin_iva", "expr": "precio_publico / (1 + IVA)" },
+    { "var": "markup", "expr": "(K - cost) / cost" },
+    { "var": "rentabilidad", "expr": "(P - cost) / P" }
+  ],
+  "overrides": [
+    { "when": { "linea": "Pesada" }, "set": { "IVA": 0.105 } }
+  ]
+}

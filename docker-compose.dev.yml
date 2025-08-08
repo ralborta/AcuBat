@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: acubat_postgres
+    environment:
+      POSTGRES_DB: acubat_pricing
+      POSTGRES_USER: acubat_user
+      POSTGRES_PASSWORD: acubat_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - acubat_network
+
+  # MinIO (S3 compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: acubat_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - acubat_network
+
+  # Adminer para gestionar PostgreSQL
+  adminer:
+    image: adminer:latest
+    container_name: acubat_adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - acubat_network
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: acubat_backend
+    environment:
+      - DATABASE_URL=postgresql://acubat_user:acubat_password@postgres:5432/acubat_pricing
+                    - S3_ENDPOINT=minio:9000
+              - S3_ACCESS_KEY=minioadmin
+              - S3_SECRET_KEY=minioadmin
+              - S3_BUCKET=acubat-pricing
+              - S3_SECURE=false
+      - DEBUG=true
+              - CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    depends_on:
+      - postgres
+      - minio
+    networks:
+      - acubat_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Next.js (opcional para desarrollo)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: acubat_frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - acubat_network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  acubat_network:
+    driver: bridge
