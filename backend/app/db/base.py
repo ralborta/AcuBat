@@ -4,24 +4,39 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from sqlalchemy.engine.url import make_url
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 # Sanitizar DATABASE_URL si el puerto no es numérico
 raw_url = settings.DATABASE_URL
+
+def _fix_port_with_regex(url: str) -> str:
+    # Reemplaza el primer segmento ":<algo no numérico>/" por ":5432/"
+    fixed = re.sub(r":[^/@]+(/|$)", r":5432\1", url, count=1)
+    if fixed != url:
+        logger.warning("DATABASE_URL tenía un puerto inválido; reemplazado por 5432 mediante regex")
+    return fixed
+
 try:
     url_obj = make_url(raw_url)
-    # url_obj.port puede disparar ValueError si no es numérico
     try:
-        _ = url_obj.port  # fuerza parseo del puerto
+        _ = url_obj.port  # valida puerto
+        database_url = str(url_obj)
     except ValueError:
-        logger.warning("DATABASE_URL contiene puerto no numérico; usando 5432 por defecto")
-        # reconstruir con puerto 5432
+        logger.warning("DATABASE_URL contiene puerto no numérico; usando 5432 por defecto (parsed)")
         url_obj = url_obj.set(port=5432)
-    database_url = str(url_obj)
+        database_url = str(url_obj)
 except Exception:
-    logger.error("DATABASE_URL inválida; usando valor original y dejando que SQLAlchemy maneje el error")
-    database_url = raw_url
+    # Si no se puede parsear, intentar fix por regex y reintentar parseo
+    logger.warning("DATABASE_URL inválida al parsear; intentando corregir puerto por regex")
+    fixed = _fix_port_with_regex(raw_url)
+    try:
+        url_obj = make_url(fixed)
+        database_url = str(url_obj)
+    except Exception:
+        logger.error("DATABASE_URL sigue siendo inválida tras corrección; usando valor corregido directamente")
+        database_url = fixed
 
 # Crear engine de SQLAlchemy
 engine = create_engine(
