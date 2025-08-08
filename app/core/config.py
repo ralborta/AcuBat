@@ -46,9 +46,9 @@ class Settings(BaseSettings):
     ENV: str = "development"
     
     # QA Gates
-    QA_GLOBAL_THRESHOLD: float = 0.08
-    QA_SKU_THRESHOLD: float = 0.15
-    AUTO_PUBLISH: bool = False
+    QA_GLOBAL_THRESHOLD: str = "0.08"
+    QA_SKU_THRESHOLD: str = "0.15"
+    AUTO_PUBLISH: str = "false"
     
     class Config:
         env_file = ".env"
