@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from app.core.config import settings
-from app.core.security import get_current_user
+# from app.core.security import get_current_user # Imported when needed
 from app.api import routes_upload, routes_simulate, routes_publish, routes_runs
 from app.db.base import engine
 from app.db.models import Base
