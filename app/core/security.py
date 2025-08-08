@@ -20,7 +20,7 @@ async def get_current_user(
     """
     if not credentials:
         # Para desarrollo, permitir acceso sin API key
-        if settings.DEBUG:
+        if settings.get_debug():
             return "dev-user"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,3 +55,4 @@ def verify_api_key(api_key: str) -> bool:
     
     # TODO: Implementar validación contra base de datos
     return True
+

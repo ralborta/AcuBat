@@ -21,8 +21,8 @@ app = FastAPI(
     title="AcuBat Pricing Platform API",
     description="API para la plataforma de pricing parametrizable y multi-producto",
     version="1.0.0",
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
+    docs_url="/docs" if settings.get_debug() else None,
+    redoc_url="/redoc" if settings.get_debug() else None,
 )
 
 # Configurar CORS
@@ -72,6 +72,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG
+        port=settings.get_port(),
+        reload=settings.get_debug()
     )

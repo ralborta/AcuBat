@@ -5,7 +5,7 @@ import os
 class Settings(BaseSettings):
     # Aplicación
     APP_NAME: str = "AcuBat Pricing Platform"
-    DEBUG: bool = False
+    DEBUG: str = "false"
     VERSION: str = "1.0.0"
     
     # Base de datos
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Seguridad
     SECRET_KEY: str = "your-secret-key-here"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: str = "30"
     
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
     S3_BUCKET: str = "acubat-pricing"
-    S3_SECURE: bool = True
+    S3_SECURE: str = "true"
     
     # API Keys
     API_KEY_HEADER: str = "x-api-key"
@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     API_SECRET: str = "your-secret-key-here"
     
     # Límites
-    MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50MB
-    MAX_UPLOAD_FILES: int = 10
+    MAX_FILE_SIZE: str = "52428800"  # 50MB
+    MAX_UPLOAD_FILES: str = "10"
     
     # Logging
     LOG_LEVEL: str = "INFO"
