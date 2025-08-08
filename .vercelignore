@@ -1,0 +1,12 @@
+# Excluir archivos grandes del deploy de Vercel
+data_files/
+*.xlsx
+*.xls
+*.csv
+*.py
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.local
