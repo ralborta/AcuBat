@@ -46,7 +46,7 @@ class Publisher:
             # Generar CSV
             csv_data = self._generate_csv(price_items, channel)
             
-            # Subir a S3
+            # Guardar CSV en almacenamiento local (volumen)
             filename = f"pricing_export_{run_id}_{channel}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
             export_url = storage_service.upload_file(
                 file_data=io.BytesIO(csv_data.encode('utf-8')),

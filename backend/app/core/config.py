@@ -31,12 +31,8 @@ class Settings(BaseSettings):
     def ALLOWED_ORIGINS(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
-    # Almacenamiento (S3)
-    S3_ENDPOINT: str = "https://s3.amazonaws.com"
-    S3_ACCESS_KEY: str = ""
-    S3_SECRET_KEY: str = ""
-    S3_BUCKET: str = "acubat-pricing"
-    S3_SECURE: str = "True"
+    # Almacenamiento local (Railway Volumes)
+    UPLOAD_DIR: str = "/app/uploads"
     
     # API Keys
     API_KEY_HEADER: str = "x-api-key"
@@ -124,11 +120,7 @@ class Settings(BaseSettings):
         except (AttributeError, ValueError):
             return False
     
-    def get_s3_secure(self) -> bool:
-        try:
-            return self.S3_SECURE.lower() in ('true', '1', 'yes', 'on')
-        except (AttributeError, ValueError):
-            return True
+    # Compat: ya no se usa S3 en Railway; se mantiene vacío a propósito
 
     # ---------- DB helpers ----------
     def _mask_database_url(self, url: str) -> str:
