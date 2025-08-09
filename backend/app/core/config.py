@@ -3,6 +3,8 @@ import sys
 import logging
 from typing import List, Optional
 from pydantic_settings import BaseSettings
+from sqlalchemy.engine.url import make_url
+import re
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -64,14 +66,12 @@ class Settings(BaseSettings):
         case_sensitive = True
 
     def get_debug(self) -> bool:
-        """Obtiene el valor de DEBUG como boolean"""
         try:
             return self.DEBUG.lower() in ('true', '1', 'yes', 'on')
         except (AttributeError, ValueError):
             return False
     
     def get_port(self) -> int:
-        """Obtiene el puerto de forma segura"""
         try:
             port = int(self.PORT)
             if 1 <= port <= 65535:
@@ -84,7 +84,6 @@ class Settings(BaseSettings):
             return 8000
     
     def get_max_file_size(self) -> int:
-        """Obtiene el tamaño máximo de archivo como int"""
         try:
             return int(self.MAX_FILE_SIZE)
         except (ValueError, TypeError):
@@ -92,7 +91,6 @@ class Settings(BaseSettings):
             return 50 * 1024 * 1024
     
     def get_max_upload_files(self) -> int:
-        """Obtiene el número máximo de archivos como int"""
         try:
             return int(self.MAX_UPLOAD_FILES)
         except (ValueError, TypeError):
@@ -100,7 +98,6 @@ class Settings(BaseSettings):
             return 10
     
     def get_access_token_expire_minutes(self) -> int:
-        """Obtiene el tiempo de expiración del token como int"""
         try:
             return int(self.ACCESS_TOKEN_EXPIRE_MINUTES)
         except (ValueError, TypeError):
@@ -108,7 +105,6 @@ class Settings(BaseSettings):
             return 30
     
     def get_qa_global_threshold(self) -> float:
-        """Obtiene el umbral global de QA como float"""
         try:
             return float(self.QA_GLOBAL_THRESHOLD)
         except (ValueError, TypeError):
@@ -116,7 +112,6 @@ class Settings(BaseSettings):
             return 0.08
     
     def get_qa_sku_threshold(self) -> float:
-        """Obtiene el umbral de SKU de QA como float"""
         try:
             return float(self.QA_SKU_THRESHOLD)
         except (ValueError, TypeError):
@@ -124,32 +119,73 @@ class Settings(BaseSettings):
             return 0.15
     
     def get_auto_publish(self) -> bool:
-        """Obtiene el valor de AUTO_PUBLISH como boolean"""
         try:
             return self.AUTO_PUBLISH.lower() in ('true', '1', 'yes', 'on')
         except (AttributeError, ValueError):
             return False
     
     def get_s3_secure(self) -> bool:
-        """Obtiene el valor de S3_SECURE como boolean"""
         try:
             return self.S3_SECURE.lower() in ('true', '1', 'yes', 'on')
         except (AttributeError, ValueError):
             return True
+
+    # ---------- DB helpers ----------
+    def _mask_database_url(self, url: str) -> str:
+        if not url:
+            return ""
+        try:
+            u = make_url(url)
+            safe = u.set(password="***")
+            return str(safe)
+        except Exception:
+            # fallback regex: user:pass@ -> user:***@
+            return re.sub(r"(://[^:]+):[^@]+@", r"\1:***@", url)
+
+    def _has_ssl_require(self, url: str) -> bool:
+        if not url:
+            return False
+        return 'sslmode=require' in url.lower()
+
+    def resolve_database_url(self) -> None:
+        """Resuelve la URL de DB con prioridades y logs. No reconstruye por partes.
+        Prioridad: DATABASE_URL > POSTGRES_URL > DATABASE_URL_WITH_SSL.
+        Ignora DB_PORT si no es numérica (solo log informativo).
+        """
+        # Ignorar DB_PORT no numérica (solo informativo; no se usa para construir)
+        db_port = os.getenv('DB_PORT')
+        if db_port and not db_port.isdigit():
+            logger.info("DB_PORT no numérica detectada; se ignora")
+
+        # Prioridades
+        env_db = os.getenv('DATABASE_URL')
+        if env_db:
+            self.DATABASE_URL = env_db
+        else:
+            pg_url = os.getenv('POSTGRES_URL')
+            ssl_url = os.getenv('DATABASE_URL_WITH_SSL')
+            if pg_url:
+                self.DATABASE_URL = pg_url
+            elif ssl_url:
+                self.DATABASE_URL = ssl_url
+            # si nada presente, mantiene el valor existente (default o .env)
+
+        # Log de qué URL se usa (enmascarada) y si sslmode=require
+        masked = self._mask_database_url(self.DATABASE_URL)
+        ssl_req = self._has_ssl_require(self.DATABASE_URL)
+        logger.info(f"DB URL usada (masked): {masked}")
+        logger.info(f"DB sslmode=require: {ssl_req}")
     
     def validate_required_env_vars(self):
-        """Valida que las variables de entorno requeridas estén presentes"""
         required_vars = {
             'DATABASE_URL': self.DATABASE_URL,
             'SECRET_KEY': self.SECRET_KEY,
             'API_SECRET': self.API_SECRET
         }
-        
         missing_vars = []
         for var_name, var_value in required_vars.items():
             if not var_value or var_value in ['your-secret-key-here', 'postgresql://user:password@localhost/acubat_pricing']:
                 missing_vars.append(var_name)
-        
         if missing_vars:
             error_msg = f"Variables de entorno requeridas faltantes o con valores por defecto: {', '.join(missing_vars)}"
             logger.error(error_msg)
@@ -157,7 +193,6 @@ class Settings(BaseSettings):
             sys.exit(1)
     
     def log_configuration_summary(self):
-        """Loguea un resumen de la configuración (sin información sensible)"""
         logger.info("=== RESUMEN DE CONFIGURACIÓN ===")
         logger.info(f"Entorno: {self.ENV}")
         logger.info(f"Modo Debug: {self.get_debug()}")
@@ -170,9 +205,9 @@ class Settings(BaseSettings):
         logger.info("================================")
 
 def create_settings() -> Settings:
-    """Crea y valida la configuración"""
     try:
         settings = Settings()
+        settings.resolve_database_url()
         settings.validate_required_env_vars()
         settings.log_configuration_summary()
         return settings
