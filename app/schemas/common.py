@@ -33,7 +33,7 @@ class SuccessResponse(BaseModel):
 
 class TenantBase(BaseModel):
     nombre: str = Field(..., description="Nombre del tenant")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    tenant_metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class TenantCreate(TenantBase):
     pass

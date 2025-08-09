@@ -15,7 +15,7 @@ class Tenant(Base):
     
     id = Column(String, primary_key=True, default=generate_uuid)
     nombre = Column(String(100), nullable=False)
-    metadata = Column(JSON, default={})
+    tenant_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
@@ -52,7 +52,7 @@ class ListRaw(Base):
     tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
     filename = Column(String(255), nullable=False)
     storage_url = Column(String(500), nullable=False)
-    metadata = Column(JSON, default={})
+    list_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, default=func.now())
     
     # Relaciones
