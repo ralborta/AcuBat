@@ -32,7 +32,7 @@ def init_database():
             acubat_tenant = Tenant(
                 id=str(uuid.uuid4()), 
                 nombre="AcuBat", 
-                metadata={
+                tenant_metadata={
                     "qa_gates": {
                         "global_threshold": 0.08,
                         "sku_threshold": 0.15,

@@ -69,7 +69,7 @@ async def upload_excel(
                 tenant_id=tenant_id,
                 filename=file.filename,
                 storage_url=storage_url,
-                metadata={
+                list_metadata={
                     "file_size": file_size,
                     "content_type": file.content_type,
                     "original_filename": file.filename
@@ -90,7 +90,7 @@ async def upload_excel(
             excel_parser.save_items_to_db(normalized_items)
             
             # Actualizar metadata con conteo de items
-            list_raw.metadata["normalized_items_count"] = len(normalized_items)
+            list_raw.list_metadata["normalized_items_count"] = len(normalized_items)
             db.commit()
             
             logger.info(f"Archivo subido exitosamente: {file.filename} - {len(normalized_items)} items")
@@ -127,7 +127,7 @@ async def get_upload_details(
     if not list_raw:
         raise HTTPException(status_code=404, detail="Lista no encontrada")
     
-    normalized_count = list_raw.metadata.get("normalized_items_count", 0)
+    normalized_count = (list_raw.list_metadata or {}).get("normalized_items_count", 0)
     
     return UploadResponse(
         id=list_raw.id,

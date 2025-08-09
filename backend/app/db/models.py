@@ -15,7 +15,9 @@ class Tenant(Base):
     
     id = Column(String, primary_key=True, default=generate_uuid)
     nombre = Column(String(100), nullable=False)
-    metadata = Column(JSON, default={})
+    # "metadata" es un nombre reservado en SQLAlchemy Declarative
+    # Usamos un nombre de atributo distinto y conservamos el nombre de columna
+    tenant_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
@@ -52,7 +54,8 @@ class ListRaw(Base):
     tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
     filename = Column(String(255), nullable=False)
     storage_url = Column(String(500), nullable=False)
-    metadata = Column(JSON, default={})
+    # Evitar conflicto con atributo reservado
+    list_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, default=func.now())
     
     # Relaciones
