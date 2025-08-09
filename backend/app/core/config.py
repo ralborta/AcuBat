@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: str = "30"
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+    # CORS dominios de producción (pueden sobreescribirse por env)
+    CORS_ORIGINS: str = (
+        "https://acubat-iqs5rbhe3-nivel-41.vercel.app,"
+        "https://acubat.vercel.app,"
+        "https://acubat-production.up.railway.app"
+    )
     
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
@@ -55,7 +60,7 @@ class Settings(BaseSettings):
     AUTO_PUBLISH: str = "False"
     
     # Puerto
-    PORT: str = "8000"
+    PORT: str = os.getenv("PORT", "8000")
     
     class Config:
         env_file = ".env"
@@ -162,6 +167,14 @@ class Settings(BaseSettings):
                 self.DATABASE_URL = ssl_url
             # si nada presente, mantiene el valor existente (default o .env)
 
+        # Enforce sslmode=require si no está presente
+        if self.DATABASE_URL:
+            lower = self.DATABASE_URL.lower()
+            if 'sslmode=' not in lower:
+                sep = '&' if '?' in self.DATABASE_URL else '?'
+                self.DATABASE_URL = f"{self.DATABASE_URL}{sep}sslmode=require"
+                logger.info("DB sslmode=require agregado a DATABASE_URL")
+
         # Log de qué URL se usa (enmascarada) y si sslmode=require
         masked = self._mask_database_url(self.DATABASE_URL)
         ssl_req = self._has_ssl_require(self.DATABASE_URL)
@@ -190,7 +203,6 @@ class Settings(BaseSettings):
         logger.info(f"Modo Debug: {self.get_debug()}")
         logger.info(f"Puerto: {self.get_port()}")
         logger.info(f"CORS Origins: {self.CORS_ORIGINS}")
-        logger.info(f"S3 Bucket: {self.S3_BUCKET}")
         logger.info(f"Log Level: {self.LOG_LEVEL}")
         logger.info(f"Max File Size: {self.get_max_file_size() // (1024*1024)}MB")
         logger.info(f"Max Upload Files: {self.get_max_upload_files()}")
