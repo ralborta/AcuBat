@@ -53,7 +53,17 @@ export default function UploadPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-                        formData.append('tenant_id', 'acubat-tenant-id') // TODO: Get from context
+      const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || ''
+      if (!tenantId) {
+        toast({
+          title: 'Falta configuración',
+          description: 'NEXT_PUBLIC_TENANT_ID no está configurado en Vercel',
+          variant: 'destructive'
+        })
+        setUploading(false)
+        return
+      }
+      formData.append('tenant_id', tenantId)
 
                       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/upload`, {
           method: 'POST',
