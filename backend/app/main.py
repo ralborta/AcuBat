@@ -6,14 +6,15 @@ import logging
 from app.core.config import settings
 # from app.core.security import get_current_user
 from app.api import routes_upload, routes_simulate, routes_publish, routes_runs
-from app.db.base import engine
+from app.db.base import engine, wait_for_db_connectivity
 from app.db.models import Base
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Crear tablas
+# Esperar a que la DB esté lista y luego crear tablas
+wait_for_db_connectivity()
 Base.metadata.create_all(bind=engine)
 
 # Crear aplicación FastAPI

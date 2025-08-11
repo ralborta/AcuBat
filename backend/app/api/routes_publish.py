@@ -108,16 +108,8 @@ async def download_csv(
         if not publish:
             raise HTTPException(status_code=404, detail="Publicación no encontrada")
         
-        # Extraer object_name de la URL
-        # Asumiendo que la URL es: http://minio:9000/bucket/object_name
-        url_parts = publish.export_url.split('/')
-        if len(url_parts) < 4:
-            raise HTTPException(status_code=500, detail="URL de exportación inválida")
-        
-        object_name = '/'.join(url_parts[3:])  # Todo después del bucket
-        
-        # Descargar archivo de S3
-        file_data = storage_service.download_file(object_name)
+        # En almacenamiento local, export_url guarda la ruta absoluta en el volumen
+        file_data = storage_service.download_file(publish.export_url)
         if not file_data:
             raise HTTPException(status_code=404, detail="Archivo no encontrado en S3")
         
