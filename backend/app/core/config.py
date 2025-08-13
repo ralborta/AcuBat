@@ -27,9 +27,10 @@ class Settings(BaseSettings):
     # CORS
     # CORS dominios de producción (pueden sobreescribirse por env)
     CORS_ORIGINS: str = (
-        "https://acubat-iqs5rbhe3-nivel-41.vercel.app,"
-        "https://acubat.vercel.app,"
-        "https://acubat-production.up.railway.app"
+        "https://frontend-jgyn1bbpe-nivel-41.vercel.app,"
+        "https://acubat-production.up.railway.app,"
+        "http://localhost:3000,"
+        "http://localhost:8000"
     )
     
     @property
