@@ -7,7 +7,10 @@ from app.core.config import settings
 # from app.core.security import get_current_user
 from app.api import routes_upload, routes_simulate, routes_publish, routes_runs
 from app.db.base import engine, wait_for_db_connectivity, create_demo_data
-from app.db.models import Base
+from app.db.models import Base, Tenant
+from sqlalchemy.orm import Session
+from app.db.base import get_db
+import uuid
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -84,6 +87,44 @@ async def get_demo_data():
             "markup_industrial": 0.35
         }
     }
+
+@app.post("/create-tenant")
+async def create_tenant_endpoint(
+    tenant_data: dict,
+    db: Session = Depends(get_db)
+):
+    """Endpoint temporal para crear tenants en Railway"""
+    try:
+        tenant_id = tenant_data.get("id", f"tenant-{uuid.uuid4()}")
+        tenant_name = tenant_data.get("nombre", "Tenant Default")
+        
+        # Verificar si ya existe
+        existing = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if existing:
+            return {"message": "Tenant ya existe", "tenant_id": existing.id}
+        
+        # Crear nuevo tenant
+        tenant = Tenant(
+            id=tenant_id,
+            nombre=tenant_name,
+            tenant_metadata=tenant_data.get("metadata", {})
+        )
+        
+        db.add(tenant)
+        db.commit()
+        db.refresh(tenant)
+        
+        logger.info(f"Tenant creado: {tenant.id}")
+        
+        return {
+            "message": "Tenant creado exitosamente",
+            "tenant_id": tenant.id,
+            "nombre": tenant.nombre
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creando tenant: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creando tenant: {str(e)}")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
