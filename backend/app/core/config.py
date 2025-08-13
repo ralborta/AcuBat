@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     DEBUG: str = "False"
     VERSION: str = "1.0.0"
     
-    # Base de datos
-    DATABASE_URL: str = "postgresql://user:password@localhost/acubat_pricing"
+    # Base de datos - TEMPORALMENTE SQLite para demo
+    DATABASE_URL: str = "sqlite:///:memory:"
     
     # Seguridad
     SECRET_KEY: str = "your-secret-key-here"
@@ -149,6 +149,12 @@ class Settings(BaseSettings):
         Prioridad: DATABASE_URL > POSTGRES_URL > DATABASE_URL_WITH_SSL.
         Ignora DB_PORT si no es numérica (solo log informativo).
         """
+        # PARA DEMO: Usar SQLite en memoria
+        if os.getenv('DEMO_MODE') == 'true' or os.getenv('DATABASE_URL', '').startswith('sqlite'):
+            self.DATABASE_URL = "sqlite:///:memory:"
+            logger.info("MODO DEMO: Usando SQLite en memoria")
+            return
+            
         # Ignorar DB_PORT no numérica (solo informativo; no se usa para construir)
         db_port = os.getenv('DB_PORT')
         if db_port and not db_port.isdigit():
@@ -182,6 +188,11 @@ class Settings(BaseSettings):
         logger.info(f"DB sslmode=require: {ssl_req}")
     
     def validate_required_env_vars(self):
+        # PARA DEMO: No validar variables de DB
+        if os.getenv('DEMO_MODE') == 'true' or self.DATABASE_URL.startswith('sqlite'):
+            logger.info("MODO DEMO: Saltando validación de variables de entorno de DB")
+            return
+            
         required_vars = {
             'DATABASE_URL': self.DATABASE_URL,
             'SECRET_KEY': self.SECRET_KEY,
@@ -206,6 +217,7 @@ class Settings(BaseSettings):
         logger.info(f"Log Level: {self.LOG_LEVEL}")
         logger.info(f"Max File Size: {self.get_max_file_size() // (1024*1024)}MB")
         logger.info(f"Max Upload Files: {self.get_max_upload_files()}")
+        logger.info(f"Base de Datos: {self.DATABASE_URL}")
         logger.info("================================")
 
 def create_settings() -> Settings:

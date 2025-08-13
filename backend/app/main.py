@@ -6,7 +6,7 @@ import logging
 from app.core.config import settings
 # from app.core.security import get_current_user
 from app.api import routes_upload, routes_simulate, routes_publish, routes_runs
-from app.db.base import engine, wait_for_db_connectivity
+from app.db.base import engine, wait_for_db_connectivity, create_demo_data
 from app.db.models import Base
 
 # Configurar logging
@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # Esperar a que la DB esté lista y luego crear tablas
 wait_for_db_connectivity()
 Base.metadata.create_all(bind=engine)
+
+# Crear datos de ejemplo si estamos en modo demo
+if "sqlite" in str(engine.url):
+    create_demo_data()
 
 # Crear aplicación FastAPI
 app = FastAPI(
@@ -47,7 +51,8 @@ async def root():
     return {
         "message": "AcuBat Pricing Platform API",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
+        "demo_mode": "sqlite" in str(engine.url)
     }
 
 @app.get("/health")
@@ -56,7 +61,28 @@ async def health_check():
     from datetime import datetime
     return {
         "status": "ok",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "database": "sqlite" if "sqlite" in str(engine.url) else "postgresql"
+    }
+
+@app.get("/demo/data")
+async def get_demo_data():
+    """Endpoint para obtener información de datos de demo"""
+    return {
+        "tenant_id": "demo-tenant-001",
+        "list_id": "demo-list-001", 
+        "ruleset_id": "demo-ruleset-001",
+        "products": [
+            {"sku": "BAT-001", "marca": "Moura", "linea": "Automotriz", "precio_base": 150.00, "costo": 100.00},
+            {"sku": "BAT-002", "marca": "Moura", "linea": "Automotriz", "precio_base": 180.00, "costo": 120.00},
+            {"sku": "BAT-003", "marca": "Varta", "linea": "Industrial", "precio_base": 250.00, "costo": 180.00}
+        ],
+        "ruleset": {
+            "nombre": "Reglas Demo 2024",
+            "markup_base": 0.25,
+            "markup_automotriz": 0.30,
+            "markup_industrial": 0.35
+        }
     }
 
 @app.exception_handler(Exception)

@@ -98,17 +98,18 @@ async def upload_excel(
             return UploadResponse(
                 id=list_raw.id,
                 filename=list_raw.filename,
-                storage_url=list_raw.storage_url,
-                tenant_id=list_raw.tenant_id,
-                created_at=list_raw.created_at,
-                normalized_items_count=len(normalized_items)
+                storage_url=storage_url,
+                normalized_items_count=len(normalized_items),
+                metadata=list_raw.list_metadata
             )
             
         finally:
             # Limpiar archivo temporal
-            if os.path.exists(temp_file_path):
+            try:
                 os.unlink(temp_file_path)
-    
+            except OSError:
+                pass
+                
     except HTTPException:
         raise
     except Exception as e:
@@ -116,24 +117,47 @@ async def upload_excel(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/upload/{list_id}", response_model=UploadResponse)
-async def get_upload_details(
+async def get_upload_status(
     list_id: str,
     db: Session = Depends(get_db)
 ):
     """
-    Obtiene los detalles de un archivo subido
+    Obtiene el estado de un upload
     """
     list_raw = db.query(ListRaw).filter(ListRaw.id == list_id).first()
     if not list_raw:
         raise HTTPException(status_code=404, detail="Lista no encontrada")
     
-    normalized_count = (list_raw.list_metadata or {}).get("normalized_items_count", 0)
-    
     return UploadResponse(
         id=list_raw.id,
         filename=list_raw.filename,
         storage_url=list_raw.storage_url,
-        tenant_id=list_raw.tenant_id,
-        created_at=list_raw.created_at,
-        normalized_items_count=normalized_count
+        normalized_items_count=list_raw.list_metadata.get("normalized_items_count", 0),
+        metadata=list_raw.list_metadata
     )
+
+@router.get("/upload/tenant/{tenant_id}", response_model=list[UploadResponse])
+async def get_tenant_uploads(
+    tenant_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene todas las listas de un tenant
+    """
+    # Validar tenant
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    
+    lists = db.query(ListRaw).filter(ListRaw.tenant_id == tenant_id).all()
+    
+    return [
+        UploadResponse(
+            id=list_raw.id,
+            filename=list_raw.filename,
+            storage_url=list_raw.storage_url,
+            normalized_items_count=list_raw.list_metadata.get("normalized_items_count", 0),
+            metadata=list_raw.list_metadata
+        )
+        for list_raw in lists
+    ]

@@ -1,15 +1,26 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/main.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/main.py": {
+      "runtime": "python3.11",
+      "maxDuration": 60,
+      "memory": 1024,
+      "includeFiles": [
+        "templates/**",
+        "static/**",
+        "Rentalibilidades-2.xlsx"
+      ]
+    },
+    "api/ping.py": {
+      "runtime": "python3.11",
+      "maxDuration": 10,
+      "memory": 128
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/main.py"
-    }
+  },
+  "routes": [
+    { "src": "^/$", "dest": "/api/ping.py" },
+    { "src": "^/health$", "dest": "/api/ping.py" },
+    { "src": "^/api/(.*)$", "dest": "/api/main.py" },
+    { "src": "/(.*)", "dest": "/api/main.py" }
   ]
-} 
+}
