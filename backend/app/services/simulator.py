@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.db.models import PriceRun, PriceItem, NormalizedItem, Ruleset
 from app.services.rules_engine import RulesEngine
-from app.schemas.pricing import RunSummary
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +166,7 @@ class PricingSimulator:
         
         return summary
     
-    def get_run_summary(self, db: Session, run_id: str) -> Optional[RunSummary]:
+    def get_run_summary(self, db: Session, run_id: str) -> Optional[Dict[str, Any]]:
         """
         Obtiene el resumen de un price run
         
@@ -182,7 +181,7 @@ class PricingSimulator:
         if not price_run or not price_run.resumen:
             return None
         
-        return RunSummary(**price_run.resumen)
+        return price_run.resumen
     
     def get_price_items(self, db: Session, run_id: str, skip: int = 0, limit: int = 50) -> List[PriceItem]:
         """
