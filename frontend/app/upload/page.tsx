@@ -65,13 +65,10 @@ export default function UploadPage() {
       }
       formData.append('tenant_id', tenantId)
 
-                      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/upload`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': process.env.NEXT_PUBLIC_API_KEY || ''
-          },
-          body: formData,
-        })
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/upload`, {
+        method: 'POST',
+        body: formData,
+      })
 
       if (response.ok) {
         const result = await response.json()
