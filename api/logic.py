@@ -15,6 +15,10 @@ class PricingLogic:
         self.rentabilidades_cargadas = False
         self.relevamiento_realizado = False
         
+        # Cache para listas específicas de precios por marca/canal
+        self.listas_especificas = {}
+        self.precios_minorista_cache = {}
+        
         # Configuración simplificada de markups por marca (según tu imagen)
         self.markups_por_marca = {
             'moura': {
@@ -159,8 +163,22 @@ class PricingLogic:
                     elif canal_lower == 'minorista':
                         markup = markup_config.get('minorista', 0.50)
                         if markup == 'lista_especial':
-                            # Para Moura minorista, usar lista especial (simulado)
-                            markup = 0.85  # Valor por defecto
+                            # Para Moura minorista, usar precio específico de lista
+                            precio_especifico = self._obtener_precio_lista_especial(
+                                producto.codigo, 
+                                marca_lower, 
+                                'minorista'
+                            )
+                            if precio_especifico:
+                                producto.precio_final = precio_especifico
+                                # Calcular el markup real aplicado
+                                markup_real = (precio_especifico - producto.precio_base) / producto.precio_base
+                                producto.markup_aplicado = markup_real * 100
+                                logger.debug(f"Precio lista especial para {producto.codigo}: ${precio_especifico:,.0f} (markup: {markup_real*100:.1f}%)")
+                                continue  # Saltar el cálculo normal de markup
+                            else:
+                                # Fallback si no se encuentra en lista específica
+                                markup = 0.85  # Valor por defecto
                     else:
                         markup = 0.25  # Default
                 else:
@@ -177,6 +195,128 @@ class PricingLogic:
         except Exception as e:
             logger.error(f"Error aplicando markups: {e}")
             return productos
+
+    def _obtener_precio_lista_especial(self, codigo: str, marca: str, canal: str) -> Optional[float]:
+        """
+        Obtiene el precio específico de la lista especial para una marca/canal
+        
+        Args:
+            codigo: Código del producto
+            marca: Marca del producto (moura, acubat, etc.)
+            canal: Canal de venta (minorista, mayorista)
+            
+        Returns:
+            Precio específico o None si no se encuentra
+        """
+        try:
+            # Generar clave de cache
+            cache_key = f"{marca}_{canal}_{codigo}"
+            
+            # Verificar cache primero
+            if cache_key in self.precios_minorista_cache:
+                return self.precios_minorista_cache[cache_key]
+            
+            # Si tenemos datos de rentabilidades cargados, buscar ahí
+            if hasattr(self, 'rentabilidades_data') and self.rentabilidades_data:
+                precio = self._buscar_en_rentabilidades(codigo, marca, canal)
+                if precio:
+                    self.precios_minorista_cache[cache_key] = precio
+                    return precio
+            
+            # Si no se encuentra, intentar cargar desde archivos conocidos
+            precio = self._cargar_precio_desde_archivo(codigo, marca, canal)
+            if precio:
+                self.precios_minorista_cache[cache_key] = precio
+                return precio
+            
+            logger.warning(f"No se encontró precio específico para {codigo} ({marca} {canal})")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo precio lista especial para {codigo}: {e}")
+            return None
+
+    def _buscar_en_rentabilidades(self, codigo: str, marca: str, canal: str) -> Optional[float]:
+        """Busca el precio en los datos de rentabilidades cargados"""
+        try:
+            if not hasattr(self, 'rentabilidades_data'):
+                return None
+                
+            # Buscar en reglas de minorista si es canal minorista
+            if canal == 'minorista' and 'reglas_minorista' in self.rentabilidades_data:
+                for regla in self.rentabilidades_data['reglas_minorista']:
+                    if regla.get('codigo') == codigo:
+                        # Calcular precio final usando markup de la regla
+                        precio_base = regla.get('precio_base', 0)
+                        markup = regla.get('markup', 0) / 100  # Convertir porcentaje a decimal
+                        precio_final = precio_base * (1 + markup)
+                        logger.debug(f"Precio encontrado en rentabilidades: {codigo} = ${precio_final:,.0f}")
+                        return precio_final
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error buscando en rentabilidades: {e}")
+            return None
+
+    def _cargar_precio_desde_archivo(self, codigo: str, marca: str, canal: str) -> Optional[float]:
+        """Intenta cargar el precio desde archivos específicos de la marca"""
+        try:
+            # Para Moura, intentar cargar desde lista específica
+            if marca == 'moura' and canal == 'minorista':
+                return self._cargar_precio_moura_minorista(codigo)
+            
+            # Agregar más marcas aquí según sea necesario
+            # elif marca == 'acubat' and canal == 'minorista':
+            #     return self._cargar_precio_acubat_minorista(codigo)
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error cargando precio desde archivo: {e}")
+            return None
+
+    def _cargar_precio_moura_minorista(self, codigo: str) -> Optional[float]:
+        """Carga precio específico de Moura minorista desde archivo"""
+        try:
+            # Intentar importar las funciones de Moura
+            from .moura_rentabilidad import analizar_rentabilidades_moura
+            
+            # Si ya tenemos los datos cargados, usarlos
+            if hasattr(self, 'moura_data_cache'):
+                for regla in self.moura_data_cache.get('reglas_minorista', []):
+                    if regla.get('codigo') == codigo:
+                        precio_base = regla.get('precio_base', 0)
+                        markup = regla.get('markup', 0) / 100
+                        return precio_base * (1 + markup)
+            
+            logger.debug(f"No se encontró precio Moura minorista para código {codigo}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error cargando precio Moura minorista: {e}")
+            return None
+
+    def cargar_listas_especificas(self, archivo_rentabilidades: str = None):
+        """
+        Carga las listas específicas de precios desde archivos
+        
+        Args:
+            archivo_rentabilidades: Ruta al archivo de rentabilidades
+        """
+        try:
+            if archivo_rentabilidades:
+                # Cargar datos de Moura
+                from .moura_rentabilidad import analizar_rentabilidades_moura
+                self.moura_data_cache = analizar_rentabilidades_moura(archivo_rentabilidades)
+                logger.info(f"✅ Listas específicas cargadas desde {archivo_rentabilidades}")
+                
+                # Marcar que tenemos rentabilidades cargadas
+                self.rentabilidades_cargadas = True
+                self.rentabilidades_data = self.moura_data_cache
+            
+        except Exception as e:
+            logger.error(f"Error cargando listas específicas: {e}")
 
     def aplicar_redondeo_simplificado(self, productos: List[Producto]) -> List[Producto]:
         """Aplica redondeo solo para minorista, de $100 en $100"""

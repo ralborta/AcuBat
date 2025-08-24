@@ -422,6 +422,13 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
             
             rentabilidades_filename = file.filename
             
+            # Cargar las listas específicas en PricingLogic
+            try:
+                pricing_logic.cargar_listas_especificas(temp_file_path)
+                logger.info("✅ Listas específicas cargadas en PricingLogic")
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudieron cargar listas específicas: {e}")
+            
             logger.info(f"✅ Archivo guardado en memoria: {file.filename} con {len(excel_file.sheet_names)} hojas")
             
             return {
@@ -430,7 +437,8 @@ async def upload_rentabilidades(file: UploadFile = File(...)):
                 "hojas": excel_file.sheet_names,
                 "total_hojas": len(excel_file.sheet_names),
                 "tamaño": len(contenido),
-                "archivo_guardado": file.filename
+                "archivo_guardado": file.filename,
+                "listas_especificas": "Cargadas" if pricing_logic.rentabilidades_cargadas else "No disponibles"
             }
             
         except Exception as e:
@@ -1656,6 +1664,49 @@ def generar_sugerencias_precio(precio_base: float, margen_actual: float) -> list
     })
     
     return sugerencias
+
+@app.get("/api/test-lista-especial/{codigo}")
+async def test_lista_especial(codigo: str, marca: str = "moura", canal: str = "minorista"):
+    """Endpoint para probar la funcionalidad de lista especial"""
+    try:
+        precio_especial = pricing_logic._obtener_precio_lista_especial(codigo, marca, canal)
+        
+        return {
+            "status": "success",
+            "codigo": codigo,
+            "marca": marca,
+            "canal": canal,
+            "precio_especial": precio_especial,
+            "encontrado": precio_especial is not None,
+            "cache_size": len(pricing_logic.precios_minorista_cache),
+            "rentabilidades_cargadas": pricing_logic.rentabilidades_cargadas
+        }
+        
+    except Exception as e:
+        logger.error(f"Error en test lista especial: {e}")
+        return {
+            "status": "error",
+            "mensaje": str(e)
+        }
+
+@app.post("/api/limpiar-cache-precios")
+async def limpiar_cache_precios():
+    """Limpia el cache de precios especiales"""
+    try:
+        pricing_logic.precios_minorista_cache.clear()
+        logger.info("✅ Cache de precios limpiado")
+        
+        return {
+            "status": "success",
+            "mensaje": "Cache de precios limpiado exitosamente"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error limpiando cache: {e}")
+        return {
+            "status": "error",
+            "mensaje": str(e)
+        }
 
 @app.post("/api/descargar-reporte-ia")
 async def descargar_reporte_ia(data: dict):
