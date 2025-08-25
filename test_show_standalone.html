@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcuBat Pricing Show - TEST STANDALONE</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .show-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            margin: 20px;
+            min-height: 90vh;
+        }
+        
+        .header-show {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+        
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e6f0ff 100%);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin: 30px 0;
+        }
+        
+        .upload-zone:hover {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, #e6f0ff 0%, #d6e8ff 100%);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.2);
+        }
+        
+        .upload-zone.dragover {
+            border-color: #38ef7d;
+            background: linear-gradient(135deg, #e8f9f1 0%, #d1f2df 100%);
+            transform: scale(1.02);
+        }
+        
+        .btn-show {
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-show:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+            color: white;
+        }
+        
+        .test-result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .error-result {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #721c24;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="show-container">
+            <!-- Header -->
+            <div class="header-show">
+                <h1 class="display-3 mb-0">
+                    <i class="fas fa-magic"></i> AcuBat Pricing Show
+                </h1>
+                <p class="lead mb-0">
+                    TEST STANDALONE - Verificación de Funcionalidad
+                </p>
+            </div>
+            
+            <div class="p-4">
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle"></i> Instrucciones de Test</h5>
+                    <p>1. Haz clic en "Seleccionar Archivo" o arrastra un archivo</p>
+                    <p>2. Debería aparecer información del archivo seleccionado</p>
+                    <p>3. Si funciona aquí, el problema está en el servidor/endpoint</p>
+                </div>
+                
+                <!-- Zona de upload -->
+                <div class="upload-zone" id="uploadZone">
+                    <div>
+                        <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
+                        <h3>Arrastra tu archivo aquí o haz clic para seleccionar</h3>
+                        <p class="text-muted">Excel, CSV o cualquier formato - Solo test de detección</p>
+                        <input type="file" id="fileInput" style="display: none;" accept=".xlsx,.xls,.csv">
+                        <button class="btn btn-show mt-3" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-folder-open"></i> Seleccionar Archivo
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Resultado del test -->
+                <div class="test-result" id="testResult">
+                    <h5><i class="fas fa-check-circle text-success"></i> ¡Funcionalidad OK!</h5>
+                    <div id="fileInfo"></div>
+                </div>
+                
+                <div class="error-result" id="errorResult">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Error detectado</h5>
+                    <div id="errorInfo"></div>
+                </div>
+                
+                <!-- Log de eventos -->
+                <div class="mt-4">
+                    <h5>Log de Eventos:</h5>
+                    <div id="eventLog" style="background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace; min-height: 100px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventCount = 0;
+        
+        function logEvent(message) {
+            eventCount++;
+            const log = document.getElementById('eventLog');
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `<div>[${timestamp}] ${eventCount}: ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+            console.log(`[TEST] ${message}`);
+        }
+        
+        // Inicializar cuando se carga la página
+        document.addEventListener('DOMContentLoaded', function() {
+            logEvent('✅ DOMContentLoaded ejecutado');
+            setupUploadZone();
+        });
+        
+        // Configurar zona de upload
+        function setupUploadZone() {
+            logEvent('🔧 Configurando zona de upload...');
+            
+            const uploadZone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+            
+            if (!uploadZone || !fileInput) {
+                logEvent('❌ Error: No se encontraron elementos uploadZone o fileInput');
+                return;
+            }
+            
+            logEvent('✅ Elementos encontrados correctamente');
+            
+            // Click para seleccionar archivo
+            uploadZone.addEventListener('click', () => {
+                logEvent('🖱️ Click detectado en upload zone');
+                fileInput.click();
+            });
+            
+            // Drag and drop
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+                logEvent('📥 Dragover detectado');
+            });
+            
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+                logEvent('📤 Dragleave detectado');
+            });
+            
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                logEvent('🎯 Drop detectado');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    logEvent(`📁 Archivo dropeado: ${file.name}`);
+                    procesarArchivoTest(file);
+                } else {
+                    logEvent('❌ No se detectaron archivos en el drop');
+                }
+            });
+            
+            // Selección de archivo
+            fileInput.addEventListener('change', (e) => {
+                logEvent('📂 Change event detectado en file input');
+                
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    logEvent(`📁 Archivo seleccionado: ${file.name}`);
+                    procesarArchivoTest(file);
+                } else {
+                    logEvent('❌ No se detectaron archivos en el change event');
+                }
+            });
+            
+            logEvent('✅ Event listeners configurados exitosamente');
+        }
+        
+        // Procesar archivo (test mode)
+        function procesarArchivoTest(file) {
+            logEvent(`🚀 Iniciando procesamiento de: ${file.name}`);
+            
+            // Mostrar información del archivo
+            const fileInfo = `
+                <strong>Nombre:</strong> ${file.name}<br>
+                <strong>Tamaño:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                <strong>Tipo:</strong> ${file.type || 'No detectado'}<br>
+                <strong>Última modificación:</strong> ${new Date(file.lastModified).toLocaleString()}
+            `;
+            
+            document.getElementById('fileInfo').innerHTML = fileInfo;
+            document.getElementById('testResult').style.display = 'block';
+            document.getElementById('errorResult').style.display = 'none';
+            
+            logEvent('✅ Información del archivo mostrada correctamente');
+            logEvent('🎉 TEST EXITOSO - La funcionalidad de carga funciona!');
+            
+            // Simular que se está procesando
+            setTimeout(() => {
+                logEvent('⚠️ En producción, aquí se enviaría al servidor /api/pricing-show-upload');
+                logEvent('💡 Si llegaste hasta aquí, el problema NO está en el frontend');
+            }, 1000);
+        }
+        
+        // Test inicial
+        logEvent('🧪 Iniciando test de funcionalidad de carga de archivos');
+        logEvent('📍 Versión: Test Standalone');
+        logEvent('🕐 Esperando DOMContentLoaded...');
+    </script>
+</body>
+</html>
