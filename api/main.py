@@ -1708,6 +1708,28 @@ async def limpiar_cache_precios():
             "mensaje": str(e)
         }
 
+@app.get("/demo", response_class=HTMLResponse)
+async def demo_dashboard(request: Request):
+    """Dashboard impresionante para demo ejecutiva"""
+    try:
+        return templates.TemplateResponse("demo_dashboard.html", {
+            "request": request,
+            "title": "AcuBat Pricing Intelligence - Demo Ejecutiva"
+        })
+    except Exception as e:
+        logger.error(f"Error cargando demo dashboard: {e}")
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Demo Error</title></head>
+        <body>
+            <h1>Error cargando demo</h1>
+            <p>{str(e)}</p>
+            <p>Asegúrate de que el archivo templates/demo_dashboard.html existe</p>
+        </body>
+        </html>
+        """, status_code=500)
+
 @app.post("/api/descargar-reporte-ia")
 async def descargar_reporte_ia(data: dict):
     """

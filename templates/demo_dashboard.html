@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcuBat Pricing Intelligence - Demo Ejecutiva</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .dashboard-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border-left: 5px solid transparent;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-card.primary { border-left-color: #667eea; }
+        .metric-card.success { border-left-color: #38ef7d; }
+        .metric-card.warning { border-left-color: #f5576c; }
+        .metric-card.info { border-left-color: #4facfe; }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .metric-icon {
+            font-size: 3rem;
+            opacity: 0.7;
+            float: right;
+            margin-top: -10px;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .alert-item {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .opportunity-item {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .header-title {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .realtime-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #38ef7d;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        .loading-bar {
+            height: 4px;
+            background: var(--primary-gradient);
+            border-radius: 2px;
+            margin-bottom: 20px;
+            animation: loading 2s ease-in-out infinite;
+        }
+        
+        @keyframes loading {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
+        .status-online {
+            color: #38ef7d;
+            font-weight: bold;
+        }
+        
+        .processing-animation {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="dashboard-container">
+            <!-- Header -->
+            <div class="p-4 border-bottom">
+                <h1 class="header-title animate__animated animate__fadeInDown">
+                    <i class="fas fa-brain"></i> AcuBat Pricing Intelligence
+                </h1>
+                <div class="text-center">
+                    <span class="realtime-indicator"></span>
+                    <span class="status-online">Sistema en Línea - Análisis en Tiempo Real</span>
+                </div>
+                <div class="loading-bar"></div>
+            </div>
+            
+            <!-- Métricas Principales -->
+            <div class="row p-4">
+                <div class="col-md-3">
+                    <div class="metric-card primary animate__animated animate__fadeInUp">
+                        <div class="metric-icon primary">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="metric-value text-primary" id="productosAnalizados">1,247</div>
+                        <div class="metric-label">Productos Analizados</div>
+                        <small class="text-muted"><i class="fas fa-bolt"></i> 542 productos/seg</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="metric-card success animate__animated animate__fadeInUp" style="animation-delay: 0.1s;">
+                        <div class="metric-icon text-success">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="metric-value text-success" id="revenueDetectado">$2.3M</div>
+                        <div class="metric-label">Revenue Detectado</div>
+                        <small class="text-muted"><i class="fas fa-calendar"></i> Potencial anual</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="metric-card warning animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+                        <div class="metric-icon text-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="metric-value text-warning" id="alertasCriticas">23</div>
+                        <div class="metric-label">Alertas Críticas</div>
+                        <small class="text-muted"><i class="fas fa-clock"></i> Requieren atención</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="metric-card info animate__animated animate__fadeInUp" style="animation-delay: 0.3s;">
+                        <div class="metric-icon text-info">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="metric-value text-info" id="precisionIA">94.7%</div>
+                        <div class="metric-label">Precisión IA</div>
+                        <small class="text-muted"><i class="fas fa-brain"></i> OpenAI GPT-4</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gráficos y Análisis -->
+            <div class="row p-4">
+                <!-- Distribución por Marca -->
+                <div class="col-md-6">
+                    <div class="chart-container animate__animated animate__fadeInLeft">
+                        <h5><i class="fas fa-chart-pie"></i> Distribución por Marca</h5>
+                        <canvas id="marcasChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Oportunidades vs Tiempo -->
+                <div class="col-md-6">
+                    <div class="chart-container animate__animated animate__fadeInRight">
+                        <h5><i class="fas fa-chart-area"></i> Oportunidades Detectadas</h5>
+                        <canvas id="oportunidadesChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Alertas y Oportunidades -->
+            <div class="row p-4">
+                <!-- Alertas Críticas -->
+                <div class="col-md-6">
+                    <div class="chart-container animate__animated animate__fadeInUp">
+                        <h5><i class="fas fa-exclamation-circle text-danger"></i> Alertas Críticas</h5>
+                        <div id="alertasList">
+                            <div class="alert-item">
+                                <strong>Moura 32-87:</strong> 23% por debajo del mercado
+                                <div><small>💰 Impacto: $45,000/mes</small></div>
+                            </div>
+                            <div class="alert-item">
+                                <strong>Varta E39:</strong> Sobrepricing del 18%
+                                <div><small>💰 Pérdida: $32,000/mes</small></div>
+                            </div>
+                            <div class="alert-item">
+                                <strong>AcuBat-45:</strong> Sin markup aplicado
+                                <div><small>💰 Oportunidad: $28,000/mes</small></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Oportunidades de Revenue -->
+                <div class="col-md-6">
+                    <div class="chart-container animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+                        <h5><i class="fas fa-trending-up text-success"></i> Oportunidades de Revenue</h5>
+                        <div id="oportunidadesList">
+                            <div class="opportunity-item">
+                                <strong>Incremento Moura:</strong> +12% precio promedio
+                                <div><small>📈 Adicional: $180,000/año</small></div>
+                            </div>
+                            <div class="opportunity-item">
+                                <strong>Optimización AcuBat:</strong> Reposicionamiento
+                                <div><small>📈 Adicional: $420,000/año</small></div>
+                            </div>
+                            <div class="opportunity-item">
+                                <strong>Cross-selling:</strong> Productos complementarios
+                                <div><small>📈 Adicional: $280,000/año</small></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- KPIs de Rendimiento -->
+            <div class="row p-4">
+                <div class="col-12">
+                    <div class="chart-container animate__animated animate__fadeInUp">
+                        <h5><i class="fas fa-tachometer-alt"></i> KPIs de Rendimiento del Sistema</h5>
+                        <div class="row text-center">
+                            <div class="col-md-2">
+                                <div class="metric-value text-primary">847%</div>
+                                <div class="metric-label">ROI Proyectado</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="metric-value text-success">1.2</div>
+                                <div class="metric-label">Meses Payback</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="metric-value text-info">96%</div>
+                                <div class="metric-label">Ahorro vs Manual</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="metric-value text-warning">1,250x</div>
+                                <div class="metric-label">Más Rápido</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="metric-value text-danger">+34%</div>
+                                <div class="metric-label">Más Preciso</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="metric-value text-success">24/7</div>
+                                <div class="metric-label">Disponibilidad</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Animación de contadores
+        function animateCounter(elementId, endValue, duration = 2000) {
+            const element = document.getElementById(elementId);
+            const startValue = 0;
+            const increment = endValue / (duration / 16);
+            let currentValue = startValue;
+            
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= endValue) {
+                    currentValue = endValue;
+                    clearInterval(timer);
+                }
+                
+                if (elementId === 'revenueDetectado') {
+                    element.textContent = '$' + (currentValue / 1000000).toFixed(1) + 'M';
+                } else if (elementId === 'precisionIA') {
+                    element.textContent = currentValue.toFixed(1) + '%';
+                } else {
+                    element.textContent = Math.floor(currentValue).toLocaleString();
+                }
+            }, 16);
+        }
+        
+        // Inicializar contadores
+        window.addEventListener('load', () => {
+            animateCounter('productosAnalizados', 1247);
+            animateCounter('revenueDetectado', 2300000);
+            animateCounter('alertasCriticas', 23);
+            animateCounter('precisionIA', 94.7);
+        });
+        
+        // Gráfico de Marcas
+        const marcasCtx = document.getElementById('marcasChart').getContext('2d');
+        new Chart(marcasCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Moura', 'AcuBat', 'Varta', 'Willard'],
+                datasets: [{
+                    data: [35, 30, 20, 15],
+                    backgroundColor: ['#667eea', '#38ef7d', '#4facfe', '#f5576c'],
+                    borderWidth: 0,
+                    hoverBorderWidth: 3,
+                    hoverBorderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    duration: 2000
+                }
+            }
+        });
+        
+        // Gráfico de Oportunidades
+        const oportunidadesCtx = document.getElementById('oportunidadesChart').getContext('2d');
+        new Chart(oportunidadesCtx, {
+            type: 'line',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Oportunidades Detectadas',
+                    data: [12, 19, 25, 32, 28, 35],
+                    borderColor: '#38ef7d',
+                    backgroundColor: 'rgba(56, 239, 125, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+        
+        // Actualización en tiempo real simulada
+        setInterval(() => {
+            const productos = document.getElementById('productosAnalizados');
+            const current = parseInt(productos.textContent.replace(/,/g, ''));
+            productos.textContent = (current + Math.floor(Math.random() * 5)).toLocaleString();
+        }, 3000);
+        
+        // Efectos de hover en las tarjetas
+        document.querySelectorAll('.metric-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-10px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+    </script>
+</body>
+</html>
