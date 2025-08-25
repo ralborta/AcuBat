@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcuBat Pricing Show - Demo en Vivo</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .show-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            margin: 20px;
+            min-height: 90vh;
+        }
+        
+        .header-show {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-show::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(255,255,255,0.1) 10px,
+                rgba(255,255,255,0.1) 20px
+            );
+            animation: move 10s linear infinite;
+        }
+        
+        @keyframes move {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e6f0ff 100%);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin: 30px 0;
+        }
+        
+        .upload-zone:hover {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, #e6f0ff 0%, #d6e8ff 100%);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.2);
+        }
+        
+        .upload-zone.dragover {
+            border-color: #38ef7d;
+            background: linear-gradient(135deg, #e8f9f1 0%, #d1f2df 100%);
+            transform: scale(1.02);
+        }
+        
+        .progress-container {
+            margin: 30px 0;
+            display: none;
+        }
+        
+        .progress-bar-custom {
+            height: 25px;
+            background: var(--primary-gradient);
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            animation: pulse 2s infinite;
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin: 30px 0;
+            padding: 0 20px;
+        }
+        
+        .step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            padding: 20px 10px;
+        }
+        
+        .step::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #ddd;
+            border-radius: 50%;
+            background: white;
+            transform: translateX(-50%);
+            transition: all 0.3s ease;
+        }
+        
+        .step.active::before {
+            border-color: #667eea;
+            background: var(--primary-gradient);
+            animation: bounce 1s infinite;
+        }
+        
+        .step.completed::before {
+            border-color: #38ef7d;
+            background: #38ef7d;
+        }
+        
+        .step-title {
+            margin-top: 50px;
+            font-weight: bold;
+            color: #333;
+            transition: color 0.3s ease;
+        }
+        
+        .step.active .step-title {
+            color: #667eea;
+        }
+        
+        .step.completed .step-title {
+            color: #38ef7d;
+        }
+        
+        .results-container {
+            display: none;
+            padding: 30px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            margin: 30px 0;
+        }
+        
+        .metric-card-show {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        
+        .metric-card-show.animate-in {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .metric-value-large {
+            font-size: 3rem;
+            font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .typing-effect {
+            font-family: 'Courier New', monospace;
+            border-right: 2px solid #667eea;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { border-color: transparent; }
+            51%, 100% { border-color: #667eea; }
+        }
+        
+        .floating-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            animation: float 6s infinite linear;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-10vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        .processing-animation {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        
+        .spinner-custom {
+            width: 80px;
+            height: 80px;
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 30px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .success-explosion {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .explosion-particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #38ef7d;
+            border-radius: 50%;
+        }
+        
+        .btn-show {
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-show:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+            color: white;
+        }
+        
+        .log-container {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .log-line {
+            margin: 5px 0;
+            opacity: 0;
+            animation: fadeInLog 0.5s ease forwards;
+        }
+        
+        @keyframes fadeInLog {
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Partículas flotantes -->
+    <div class="floating-particles" id="particles"></div>
+    
+    <!-- Explosión de éxito -->
+    <div class="success-explosion" id="successExplosion"></div>
+    
+    <div class="container-fluid">
+        <div class="show-container">
+            <!-- Header -->
+            <div class="header-show">
+                <div class="header-content">
+                    <h1 class="display-3 mb-0 animate__animated animate__fadeInDown">
+                        <i class="fas fa-magic"></i> AcuBat Pricing Show
+                    </h1>
+                    <p class="lead mb-0 animate__animated animate__fadeInUp animate__delay-1s">
+                        Generación Dinámica de Pricing en Tiempo Real
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-4">
+                <!-- Indicador de pasos -->
+                <div class="step-indicator">
+                    <div class="step" id="step1">
+                        <div class="step-title">📁 Análisis</div>
+                    </div>
+                    <div class="step" id="step2">
+                        <div class="step-title">🤖 Generación</div>
+                    </div>
+                    <div class="step" id="step3">
+                        <div class="step-title">💰 Pricing</div>
+                    </div>
+                    <div class="step" id="step4">
+                        <div class="step-title">📊 Resultados</div>
+                    </div>
+                </div>
+                
+                <!-- Zona de upload -->
+                <div class="upload-zone" id="uploadZone">
+                    <div class="animate__animated animate__pulse animate__infinite">
+                        <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
+                        <h3>Arrastra tu archivo aquí o haz clic para seleccionar</h3>
+                        <p class="text-muted">Excel, CSV o cualquier formato - El sistema lo analizará automáticamente</p>
+                        <input type="file" id="fileInput" style="display: none;" accept=".xlsx,.xls,.csv">
+                        <button class="btn btn-show mt-3" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-folder-open"></i> Seleccionar Archivo
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Contenedor de progreso -->
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-custom" id="progressBar" style="width: 0%">
+                            <div class="progress-text" id="progressText">Iniciando...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Animación de procesamiento -->
+                <div class="processing-animation" id="processingAnimation">
+                    <div class="spinner-custom"></div>
+                    <h4 id="processingText">Analizando archivo...</h4>
+                    <p class="text-muted" id="processingSubtext">Esto puede tomar unos segundos</p>
+                </div>
+                
+                <!-- Log en tiempo real -->
+                <div class="log-container" id="logContainer">
+                    <div id="logContent"></div>
+                </div>
+                
+                <!-- Contenedor de resultados -->
+                <div class="results-container" id="resultsContainer">
+                    <h2 class="text-center mb-4">
+                        <i class="fas fa-chart-line"></i> Resultados del Análisis
+                    </h2>
+                    
+                    <div class="row">
+                        <!-- Métricas principales -->
+                        <div class="col-md-3">
+                            <div class="metric-card-show" data-delay="0">
+                                <div class="text-center">
+                                    <div class="metric-value-large" id="productosGenerados">0</div>
+                                    <div class="h6 text-muted">Productos Generados</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card-show" data-delay="200">
+                                <div class="text-center">
+                                    <div class="metric-value-large" id="revenueAnual">$0</div>
+                                    <div class="h6 text-muted">Revenue Anual</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card-show" data-delay="400">
+                                <div class="text-center">
+                                    <div class="metric-value-large" id="margenPromedio">0%</div>
+                                    <div class="h6 text-muted">Margen Promedio</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card-show" data-delay="600">
+                                <div class="text-center">
+                                    <div class="metric-value-large" id="velocidadProcesamiento">0</div>
+                                    <div class="h6 text-muted">Productos/Seg</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detalles adicionales -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="metric-card-show" data-delay="800">
+                                <h5><i class="fas fa-industry"></i> Distribución por Marca</h5>
+                                <div id="distribucionMarcas"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="metric-card-show" data-delay="1000">
+                                <h5><i class="fas fa-bullseye"></i> Oportunidades Detectadas</h5>
+                                <div id="oportunidadesDetectadas"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botones de acción -->
+                    <div class="text-center mt-4">
+                        <button class="btn btn-show me-3" onclick="descargarResultados()">
+                            <i class="fas fa-download"></i> Descargar Excel
+                        </button>
+                        <button class="btn btn-show" onclick="ejecutarNuevoShow()">
+                            <i class="fas fa-redo"></i> Nuevo Análisis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let currentStep = 0;
+        let showActive = false;
+        
+        // Inicializar efectos
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
+            setupUploadZone();
+        });
+        
+        // Crear partículas flotantes
+        function createParticles() {
+            const container = document.getElementById('particles');
+            
+            setInterval(() => {
+                if (Math.random() < 0.3) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 2 + 's';
+                    container.appendChild(particle);
+                    
+                    setTimeout(() => {
+                        particle.remove();
+                    }, 6000);
+                }
+            }, 500);
+        }
+        
+        // Configurar zona de upload
+        function setupUploadZone() {
+            const uploadZone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+            
+            // Click para seleccionar archivo
+            uploadZone.addEventListener('click', () => {
+                if (!showActive) {
+                    fileInput.click();
+                }
+            });
+            
+            // Drag and drop
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+            
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+            
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                
+                if (!showActive && e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    procesarArchivo(file);
+                }
+            });
+            
+            // Selección de archivo
+            fileInput.addEventListener('change', (e) => {
+                if (!showActive && e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    procesarArchivo(file);
+                }
+            });
+        }
+        
+        // Procesar archivo con show completo
+        async function procesarArchivo(file) {
+            if (showActive) return;
+            
+            showActive = true;
+            console.log('🎭 Iniciando show con archivo:', file.name);
+            
+            // Ocultar upload zone y mostrar progreso
+            document.getElementById('uploadZone').style.display = 'none';
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('processingAnimation').style.display = 'block';
+            document.getElementById('logContainer').style.display = 'block';
+            
+            try {
+                // Crear FormData
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Iniciar show de pasos
+                iniciarShowPasos();
+                
+                // Llamar al endpoint
+                const response = await fetch('/api/pricing-show-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const resultado = await response.json();
+                
+                if (resultado.status === 'success' || resultado.status === 'success_simulated') {
+                    // Show completado exitosamente
+                    completarShow(resultado);
+                } else {
+                    // Error en el procesamiento
+                    mostrarError(resultado.mensaje);
+                }
+                
+            } catch (error) {
+                console.error('Error procesando archivo:', error);
+                mostrarError('Error de conexión con el servidor');
+            }
+        }
+        
+        // Iniciar show de pasos
+        function iniciarShowPasos() {
+            const pasos = [
+                { id: 'step1', text: 'Analizando estructura del archivo...', duration: 2000 },
+                { id: 'step2', text: 'Generando productos dinámicamente...', duration: 3000 },
+                { id: 'step3', text: 'Aplicando pricing inteligente...', duration: 2500 },
+                { id: 'step4', text: 'Calculando métricas de impacto...', duration: 1500 }
+            ];
+            
+            let totalDuration = 0;
+            pasos.forEach(paso => totalDuration += paso.duration);
+            
+            let currentTime = 0;
+            pasos.forEach((paso, index) => {
+                setTimeout(() => {
+                    activarPaso(paso.id, paso.text);
+                    actualizarProgreso((currentTime / totalDuration) * 100, paso.text);
+                }, currentTime);
+                
+                setTimeout(() => {
+                    completarPaso(paso.id);
+                }, currentTime + paso.duration - 500);
+                
+                currentTime += paso.duration;
+            });
+            
+            // Agregar logs en tiempo real
+            setTimeout(() => addLog('🔍 Detectando columnas de productos...'), 500);
+            setTimeout(() => addLog('✅ Estructura identificada: Lista de productos'), 1200);
+            setTimeout(() => addLog('🤖 Inicializando generador dinámico...'), 2500);
+            setTimeout(() => addLog('📊 Aplicando distribución realista de marcas...'), 4000);
+            setTimeout(() => addLog('💰 Calculando markup por canal...'), 6000);
+            setTimeout(() => addLog('📈 Generando métricas de impacto...'), 7500);
+            setTimeout(() => addLog('🎉 Procesamiento completado exitosamente!'), 8800);
+        }
+        
+        // Activar paso
+        function activarPaso(stepId, text) {
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            
+            document.getElementById(stepId).classList.add('active');
+            document.getElementById('processingText').textContent = text;
+        }
+        
+        // Completar paso
+        function completarPaso(stepId) {
+            document.getElementById(stepId).classList.remove('active');
+            document.getElementById(stepId).classList.add('completed');
+        }
+        
+        // Actualizar progreso
+        function actualizarProgreso(porcentaje, texto) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            progressBar.style.width = porcentaje + '%';
+            progressText.textContent = `${Math.round(porcentaje)}% - ${texto}`;
+        }
+        
+        // Agregar log
+        function addLog(message) {
+            const logContent = document.getElementById('logContent');
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+            logLine.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            
+            logContent.appendChild(logLine);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        // Completar show
+        function completarShow(resultado) {
+            setTimeout(() => {
+                // Ocultar elementos de procesamiento
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('processingAnimation').style.display = 'none';
+                document.getElementById('logContainer').style.display = 'none';
+                
+                // Mostrar resultados
+                mostrarResultados(resultado.resultado);
+                
+                // Explosión de éxito
+                mostrarExplosionExito();
+                
+                showActive = false;
+            }, 9500);
+        }
+        
+        // Mostrar resultados
+        function mostrarResultados(datos) {
+            const container = document.getElementById('resultsContainer');
+            container.style.display = 'block';
+            
+            // Animar métricas principales
+            const metricas = datos.metricas_impacto.resumen_general;
+            
+            setTimeout(() => {
+                animateCounter('productosGenerados', metricas.productos_generados);
+                animateCounter('revenueAnual', metricas.revenue_anual_proyectado, true);
+                animateCounter('margenPromedio', metricas.margen_promedio, false, '%');
+                animateCounter('velocidadProcesamiento', datos.metricas_impacto.tiempo_procesamiento.productos_por_segundo);
+            }, 500);
+            
+            // Animar tarjetas
+            document.querySelectorAll('.metric-card-show').forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('animate-in');
+                }, parseInt(card.dataset.delay) || index * 200);
+            });
+            
+            // Llenar detalles
+            llenarDistribucionMarcas(datos.metricas_impacto.distribucion_marcas);
+            llenarOportunidades(datos.metricas_impacto.oportunidades_detectadas);
+        }
+        
+        // Animar contador
+        function animateCounter(elementId, endValue, isCurrency = false, suffix = '') {
+            const element = document.getElementById(elementId);
+            const duration = 2000;
+            const increment = endValue / (duration / 16);
+            let currentValue = 0;
+            
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= endValue) {
+                    currentValue = endValue;
+                    clearInterval(timer);
+                }
+                
+                let displayValue;
+                if (isCurrency) {
+                    displayValue = '$' + Math.floor(currentValue).toLocaleString();
+                } else {
+                    displayValue = Math.floor(currentValue).toLocaleString();
+                }
+                
+                element.textContent = displayValue + suffix;
+            }, 16);
+        }
+        
+        // Llenar distribución de marcas
+        function llenarDistribucionMarcas(distribucion) {
+            const container = document.getElementById('distribucionMarcas');
+            let html = '';
+            
+            for (const [marca, datos] of Object.entries(distribucion)) {
+                html += `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold">${marca.charAt(0).toUpperCase() + marca.slice(1)}</span>
+                        <span class="badge bg-primary">${datos.productos} productos</span>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // Llenar oportunidades
+        function llenarOportunidades(oportunidades) {
+            const container = document.getElementById('oportunidadesDetectadas');
+            
+            container.innerHTML = `
+                <div class="mb-2">
+                    <span class="text-success fw-bold">Alto Potencial:</span>
+                    <span class="float-end">${oportunidades.productos_alto_potencial} productos</span>
+                </div>
+                <div class="mb-2">
+                    <span class="text-warning fw-bold">Requieren Atención:</span>
+                    <span class="float-end">${oportunidades.productos_margen_bajo} productos</span>
+                </div>
+                <div class="mb-2">
+                    <span class="text-primary fw-bold">Optimización Potencial:</span>
+                    <span class="float-end">$${oportunidades.optimizacion_potencial.toLocaleString()}</span>
+                </div>
+            `;
+        }
+        
+        // Mostrar explosión de éxito
+        function mostrarExplosionExito() {
+            const explosion = document.getElementById('successExplosion');
+            explosion.style.display = 'block';
+            
+            // Crear partículas de explosión
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'explosion-particle';
+                
+                const angle = (i / 20) * 2 * Math.PI;
+                const distance = 100 + Math.random() * 100;
+                
+                particle.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+                particle.style.animation = `explosionParticle 1s ease-out forwards`;
+                
+                explosion.appendChild(particle);
+            }
+            
+            setTimeout(() => {
+                explosion.style.display = 'none';
+                explosion.innerHTML = '';
+            }, 1500);
+        }
+        
+        // Mostrar error
+        function mostrarError(mensaje) {
+            alert('Error: ' + mensaje);
+            ejecutarNuevoShow();
+        }
+        
+        // Ejecutar nuevo show
+        function ejecutarNuevoShow() {
+            showActive = false;
+            
+            // Resetear interfaz
+            document.getElementById('uploadZone').style.display = 'block';
+            document.getElementById('progressContainer').style.display = 'none';
+            document.getElementById('processingAnimation').style.display = 'none';
+            document.getElementById('logContainer').style.display = 'none';
+            document.getElementById('resultsContainer').style.display = 'none';
+            
+            // Resetear pasos
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+            
+            // Limpiar logs
+            document.getElementById('logContent').innerHTML = '';
+            
+            // Resetear input
+            document.getElementById('fileInput').value = '';
+        }
+        
+        // Descargar resultados
+        function descargarResultados() {
+            alert('Funcionalidad de descarga próximamente...');
+        }
+        
+        // CSS dinámico para animación de explosión
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes explosionParticle {
+                0% {
+                    opacity: 1;
+                    transform: translate(0, 0) scale(1);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translate(var(--x, 0), var(--y, 0)) scale(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
