@@ -222,7 +222,7 @@ class DynamicPricingShow:
         }
     
     def aplicar_pricing_inteligente(self, productos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Aplica pricing inteligente con show dramático"""
+        """Aplica pricing inteligente con show dramático y análisis de rentabilidad"""
         
         print("\n💰 PASO 3: APLICANDO PRICING INTELIGENTE...")
         self._actualizar_progreso(85, "Inicializando motor de pricing")
@@ -233,7 +233,7 @@ class DynamicPricingShow:
         for i, producto in enumerate(productos):
             # Progreso dramático
             if i % 5 == 0:
-                progreso = 85 + (10 * i / total_productos)
+                progreso = 85 + (8 * i / total_productos)
                 self._actualizar_progreso(progreso, f"Aplicando pricing {i+1}/{total_productos}")
                 time.sleep(0.03)
             
@@ -241,11 +241,22 @@ class DynamicPricingShow:
             producto_completo = self._aplicar_pricing_por_canales(producto)
             productos_con_pricing.append(producto_completo)
         
-        self._actualizar_progreso(95, "Optimizando precios finales")
+        self._actualizar_progreso(93, "Analizando rentabilidad por canal")
+        
+        # Aplicar análisis de rentabilidad del sector baterías
+        try:
+            from api.rentabilidad_sector_baterias import analizar_productos_con_rentabilidad_sector
+            productos_con_rentabilidad = analizar_productos_con_rentabilidad_sector(productos_con_pricing)
+            self._actualizar_progreso(95, "Análisis de rentabilidad completado")
+        except Exception as e:
+            logger.warning(f"Error en análisis de rentabilidad: {e}")
+            productos_con_rentabilidad = productos_con_pricing
+        
+        self._actualizar_progreso(97, "Optimizando precios finales")
         time.sleep(1)
         
-        print(f"✅ Pricing aplicado a {len(productos_con_pricing)} productos")
-        return productos_con_pricing
+        print(f"✅ Pricing y rentabilidad aplicados a {len(productos_con_rentabilidad)} productos")
+        return productos_con_rentabilidad
     
     def _aplicar_pricing_por_canales(self, producto: Dict[str, Any]) -> Dict[str, Any]:
         """Aplica pricing realista por canal"""
@@ -296,55 +307,126 @@ class DynamicPricingShow:
         return producto_completo
     
     def generar_metricas_impacto(self, productos_finales: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Genera métricas de impacto impresionantes"""
+        """Genera métricas de impacto impresionantes con análisis de rentabilidad"""
         
         print("\n📊 PASO 4: CALCULANDO IMPACTO FINANCIERO...")
         self._actualizar_progreso(98, "Generando métricas de impacto")
         
         total_productos = len(productos_finales)
         
-        # Métricas por marca
+        # Métricas por marca con rentabilidad
         metricas_marca = {}
         for marca in self.productos_base.keys():
             productos_marca = [p for p in productos_finales if p["marca"] == marca]
             if productos_marca:
                 revenue_promedio = np.mean([p["precio_promedio"] for p in productos_marca])
+                
+                # Extraer métricas de rentabilidad si están disponibles
+                rentabilidad_promedio = 0
+                if productos_marca and "analisis_rentabilidad" in productos_marca[0]:
+                    rentabilidades = []
+                    for prod in productos_marca:
+                        analisis = prod.get("analisis_rentabilidad", {})
+                        consolidada = analisis.get("rentabilidad_consolidada", {})
+                        margen = consolidada.get("margen_promedio_canales", 0)
+                        if margen > 0:
+                            rentabilidades.append(margen)
+                    rentabilidad_promedio = np.mean(rentabilidades) if rentabilidades else 0
+                
                 metricas_marca[marca] = {
                     "productos": len(productos_marca),
                     "revenue_promedio": int(revenue_promedio),
-                    "participacion": len(productos_marca) / total_productos * 100
+                    "participacion": len(productos_marca) / total_productos * 100,
+                    "rentabilidad_promedio": rentabilidad_promedio
                 }
         
-        # Métricas por canal
-        revenue_total_canales = {}
+        # Métricas por canal con análisis de rentabilidad
+        revenue_por_canal = {}
+        rentabilidad_por_canal = {}
+        
         for canal in self.canales:
             revenue_canal = sum([p["pricing_canales"][canal]["precio_final"] for p in productos_finales])
-            revenue_total_canales[canal] = revenue_canal
+            revenue_por_canal[canal] = revenue_canal
+            
+            # Calcular rentabilidad promedio por canal
+            rentabilidades_canal = []
+            for producto in productos_finales:
+                analisis = producto.get("analisis_rentabilidad", {})
+                if analisis:
+                    analisis_canal = analisis.get("analisis_por_canal", {}).get(canal, {})
+                    margen = analisis_canal.get("margen_neto_pct", 
+                            analisis_canal.get("margen_contribucion_pct",
+                            analisis_canal.get("margen_zona_pct", 0)))
+                    if margen > 0:
+                        rentabilidades_canal.append(margen)
+            
+            rentabilidad_por_canal[canal] = {
+                "revenue": revenue_canal,
+                "rentabilidad_promedio": np.mean(rentabilidades_canal) if rentabilidades_canal else 0,
+                "productos_rentables": len([r for r in rentabilidades_canal if r >= 20]),
+                "metodologia": self._obtener_metodologia_canal(canal)
+            }
         
-        # Métricas de impacto
-        revenue_total_estimado = sum(revenue_total_canales.values())
+        # Métricas consolidadas
+        revenue_total_estimado = sum(revenue_por_canal.values())
         margen_promedio = np.mean([p["margen_promedio"] for p in productos_finales])
+        
+        # Análisis de rentabilidad global
+        productos_con_analisis = [p for p in productos_finales if "analisis_rentabilidad" in p]
+        
+        rentabilidad_global = {}
+        if productos_con_analisis:
+            evaluaciones = []
+            for producto in productos_con_analisis:
+                consolidada = producto["analisis_rentabilidad"].get("rentabilidad_consolidada", {})
+                eval_general = consolidada.get("evaluacion_general", "")
+                if eval_general:
+                    evaluaciones.append(eval_general)
+            
+            rentabilidad_global = {
+                "productos_estrella": evaluaciones.count("PRODUCTO_ESTRELLA"),
+                "productos_rentables": evaluaciones.count("PRODUCTO_RENTABLE"), 
+                "productos_marginales": evaluaciones.count("PRODUCTO_MARGINAL"),
+                "productos_problematicos": evaluaciones.count("PRODUCTO_PROBLEMATICO"),
+                "rentabilidad_promedio_sector": np.mean([
+                    prod["analisis_rentabilidad"]["rentabilidad_consolidada"]["margen_promedio_canales"]
+                    for prod in productos_con_analisis
+                    if "margen_promedio_canales" in prod["analisis_rentabilidad"]["rentabilidad_consolidada"]
+                ])
+            }
         
         # Simulaciones de venta
         ventas_estimadas_mes = random.randint(500, 2000)
         revenue_mensual = revenue_total_estimado * ventas_estimadas_mes / total_productos
         revenue_anual = revenue_mensual * 12
         
+        # Cálculo de rentabilidad proyectada
+        rentabilidad_promedio_ponderada = sum([
+            canal_data["rentabilidad_promedio"] * canal_data["revenue"] 
+            for canal_data in rentabilidad_por_canal.values()
+        ]) / revenue_total_estimado if revenue_total_estimado > 0 else 0
+        
+        beneficio_anual_proyectado = revenue_anual * (rentabilidad_promedio_ponderada / 100)
+        
         metricas = {
             "resumen_general": {
                 "productos_generados": total_productos,
                 "revenue_total_estimado": revenue_total_estimado,
                 "margen_promedio": margen_promedio,
+                "rentabilidad_promedio_sector": rentabilidad_promedio_ponderada,
                 "ventas_estimadas_mes": ventas_estimadas_mes,
                 "revenue_mensual_proyectado": int(revenue_mensual),
-                "revenue_anual_proyectado": int(revenue_anual)
+                "revenue_anual_proyectado": int(revenue_anual),
+                "beneficio_anual_proyectado": int(beneficio_anual_proyectado)
             },
             "distribucion_marcas": metricas_marca,
-            "revenue_por_canal": revenue_total_canales,
+            "analisis_por_canal": rentabilidad_por_canal,
+            "rentabilidad_global": rentabilidad_global,
             "oportunidades_detectadas": {
-                "productos_margen_bajo": len([p for p in productos_finales if p["margen_promedio"] < 15]),
-                "productos_alto_potencial": len([p for p in productos_finales if p["margen_promedio"] > 35]),
-                "optimizacion_potencial": random.randint(150000, 850000)
+                "productos_margen_bajo": rentabilidad_global.get("productos_marginales", 0) + rentabilidad_global.get("productos_problematicos", 0),
+                "productos_alto_potencial": rentabilidad_global.get("productos_estrella", 0) + rentabilidad_global.get("productos_rentables", 0),
+                "optimizacion_potencial": int(beneficio_anual_proyectado * 0.15) if beneficio_anual_proyectado > 0 else random.randint(150000, 850000),
+                "canal_mas_rentable": max(rentabilidad_por_canal.items(), key=lambda x: x[1]["rentabilidad_promedio"])[0] if rentabilidad_por_canal else "minorista"
             },
             "tiempo_procesamiento": {
                 "segundos_total": random.uniform(2.1, 4.8),
@@ -354,8 +436,21 @@ class DynamicPricingShow:
         
         self.metricas_show = metricas
         
-        print(f"✅ Métricas calculadas: ${revenue_anual:,.0f} revenue anual proyectado")
+        print(f"✅ Métricas calculadas:")
+        print(f"   💰 Revenue anual: ${revenue_anual:,.0f}")
+        print(f"   📈 Beneficio proyectado: ${beneficio_anual_proyectado:,.0f}")
+        print(f"   🎯 Rentabilidad promedio: {rentabilidad_promedio_ponderada:.1f}%")
+        
         return metricas
+    
+    def _obtener_metodologia_canal(self, canal: str) -> str:
+        """Obtiene la metodología de análisis para cada canal"""
+        metodologias = {
+            "mayorista": "Margen de Contribución",
+            "minorista": "Rentabilidad Integral", 
+            "distribuidor": "Eficiencia Territorial"
+        }
+        return metodologias.get(canal, "Análisis Estándar")
     
     def ejecutar_show_completo(self, file_path: str = None) -> Dict[str, Any]:
         """Ejecuta el show completo paso a paso"""

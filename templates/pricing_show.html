@@ -454,15 +454,22 @@
                     
                     <!-- Detalles adicionales -->
                     <div class="row mt-4">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="metric-card-show" data-delay="800">
                                 <h5><i class="fas fa-industry"></i> Distribución por Marca</h5>
                                 <div id="distribucionMarcas"></div>
                             </div>
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="metric-card-show" data-delay="1000">
+                                <h5><i class="fas fa-chart-bar"></i> Rentabilidad por Canal</h5>
+                                <div id="rentabilidadCanales"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="metric-card-show" data-delay="1200">
                                 <h5><i class="fas fa-bullseye"></i> Oportunidades Detectadas</h5>
                                 <div id="oportunidadesDetectadas"></div>
                             </div>
@@ -713,6 +720,7 @@
             
             // Llenar detalles
             llenarDistribucionMarcas(datos.metricas_impacto.distribucion_marcas);
+            llenarRentabilidadCanales(datos.metricas_impacto.analisis_por_canal || {});
             llenarOportunidades(datos.metricas_impacto.oportunidades_detectadas);
         }
         
@@ -747,10 +755,49 @@
             let html = '';
             
             for (const [marca, datos] of Object.entries(distribucion)) {
+                const rentabilidad = datos.rentabilidad_promedio || 0;
+                const colorBadge = rentabilidad >= 30 ? 'bg-success' : rentabilidad >= 20 ? 'bg-warning' : 'bg-danger';
+                
                 html += `
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="fw-bold">${marca.charAt(0).toUpperCase() + marca.slice(1)}</span>
-                        <span class="badge bg-primary">${datos.productos} productos</span>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold">${marca.charAt(0).toUpperCase() + marca.slice(1)}</span>
+                            <span class="badge bg-primary">${datos.productos} productos</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">Rentabilidad:</small>
+                            <span class="badge ${colorBadge}">${rentabilidad.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // Llenar rentabilidad por canal
+        function llenarRentabilidadCanales(analisisCanales) {
+            const container = document.getElementById('rentabilidadCanales');
+            let html = '';
+            
+            for (const [canal, datos] of Object.entries(analisisCanales)) {
+                const rentabilidad = datos.rentabilidad_promedio || 0;
+                const metodologia = datos.metodologia || 'Análisis Estándar';
+                const colorBadge = rentabilidad >= 30 ? 'bg-success' : rentabilidad >= 20 ? 'bg-warning' : 'bg-danger';
+                
+                html += `
+                    <div class="mb-3 p-2 border rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold">${canal.charAt(0).toUpperCase() + canal.slice(1)}</span>
+                            <span class="badge ${colorBadge}">${rentabilidad.toFixed(1)}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted">Revenue:</small>
+                            <small>$${(datos.revenue || 0).toLocaleString()}</small>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted">${metodologia}</small>
+                        </div>
                     </div>
                 `;
             }
